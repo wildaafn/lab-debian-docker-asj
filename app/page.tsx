@@ -6,7 +6,7 @@ import { modules, type CommandBlock, type Module } from "./data";
 type Quiz = { question: string; options: string[]; answer: number; explanation: string };
 
 const quizzes: Record<string, Quiz> = {
-  persiapan: { question: "Apa tanda Docker siap dipakai?", options: ["Browser terbuka", "Docker Engine running", "Wi-Fi dimatikan"], answer: 1, explanation: "Docker Engine harus aktif sebelum container dapat dijalankan." },
+  persiapan: { question: "Apa tanda Docker siap dipakai?", options: ["Browser terbuka", "Docker Engine running", "Wi-Fi dimatkan"], answer: 1, explanation: "Docker Engine harus aktif sebelum container dapat dijalankan." },
   debian: { question: "Mengapa semua container memakai jaringan lab-asj?", options: ["Agar saling terhubung secara terisolasi", "Agar RAM bertambah", "Agar Docker tidak perlu diinstal"], answer: 0, explanation: "Bridge network membuat perangkat lab saling berkomunikasi tanpa mencampuri LAN sekolah." },
   web: { question: "Arti pemetaan port 8080:80 adalah…", options: ["Port 80 host menuju 8080 container", "Port 8080 host menuju 80 container", "Kedua port dinonaktifkan"], answer: 1, explanation: "Akses ke port 8080 host diteruskan ke Apache pada port 80 di container." },
   database: { question: "Fungsi volume data-db-asj adalah…", options: ["Menyimpan data agar tetap ada", "Mengganti password otomatis", "Mempercepat internet"], answer: 0, explanation: "Volume membuat data database tetap tersimpan walau container dibuat ulang." },
@@ -147,7 +147,7 @@ export default function Home() {
     <div className="app-shell">
       {celebrate && <div className="celebration" role="status" aria-live="polite"><div className="confetti">{Array.from({ length: 18 }).map((_, i) => <i key={i} />)}</div><strong>Modul selesai! +100 XP</strong><span>Kerja bagus—server berikutnya menunggu.</span></div>}
       <aside className={`sidebar ${menu ? "open" : ""}`}>
-        <div className="brand"><div className="brand-mark">W</div><div><strong>Wilda AFN</strong><span>ASJ Learning Lab</span></div><button className="close-menu" onClick={() => setMenu(false)}>×</button></div>
+        <div className="brand"><div className="brand-mark">W</div><div><strong>Wilda Ariffatul Faisalnur, S.Kom</strong><span>ASJ Learning Lab</span></div><button className="close-menu" onClick={() => setMenu(false)}>×</button></div>
         <div className="progress-card"><div className="progress-copy"><span>Level {level} · {xp} XP</span><strong>{percent}%</strong></div><div className="progress-track"><i style={{ width: `${percent}%` }} /></div><small>🔥 {streak} hari belajar · {completed.length}/{modules.length} modul</small></div>
         <nav aria-label="Navigasi modul">
           <button onClick={() => go("overview")} className={active === "overview" ? "active" : ""}><span className="nav-icon">⌂</span><span>Ringkasan Lab</span></button>
@@ -162,7 +162,7 @@ export default function Home() {
         <div className="content">
           {active === "overview" ? <>
             <section className="hero">
-              <div className="hero-copy"><span className="eyebrow">Praktik ringan • terisolasi • dapat diulang</span><h1>Belajar Debian Server<br/><em>tanpa VirtualBox.</em></h1><p>Lab interaktif untuk ASJ kelas XI TKJ. Jalankan server pada container terpisah, salin perintah, uji hasilnya, dan simpan progres langsung di browser.</p><div className="hero-actions"><button className="primary-button" onClick={() => go("persiapan")}>Mulai praktik <span>→</span></button><a className="secondary-button" href="#topologi">Lihat topologi</a></div></div>
+              <div className="hero-copy"><span className="eyebrow">Praktik ringan • terisolasi • dapat diulang</span><h1>Belajar Debian Server<br/><em>tanpa VirtualBox.</em></h1><p>Lab interaktif untuk ASJ kelas XI TKJ. Disusun oleh Wilda Ariffatul Faisalnur, S.Kom. Jalankan server pada container terpisah, salin perintah, uji hasilnya, dan simpan progres langsung di browser.</p><div className="hero-actions"><button className="primary-button" onClick={() => go("persiapan")}>Mulai praktik <span>→</span></button><a className="secondary-button" href="#topologi">Lihat topologi</a></div></div>
               <div className="terminal-card"><div className="terminal-bar"><i/><i/><i/><span>client-asj — bash</span></div><pre><span className="prompt">siswa@client-asj:~$</span> docker ps{`\n`}<span className="muted">CONTAINER   SERVICE       STATUS</span>{`\n`}a8c21f31    web-asj       <span className="green">Up</span>{`\n`}e13b8d40    dns-asj       <span className="green">Up</span>{`\n`}b22c019f    db-asj        <span className="green">Up</span>{`\n\n`}<span className="prompt">siswa@client-asj:~$</span> curl web.sekolah.test{`\n`}<span className="cyan">&lt;h1&gt;Web Server ASJ XI TKJ&lt;/h1&gt;</span></pre></div>
             </section>
             <section className="stats"><div><strong>9</strong><span>Modul bertahap</span></div><div><strong>7</strong><span>Layanan server</span></div><div><strong>384 MB</strong><span>RAM mulai/container</span></div><div><strong>1</strong><span>Jaringan terisolasi</span></div></section>
@@ -176,7 +176,7 @@ export default function Home() {
             <section className="safety"><div><span className="eyebrow">Wajib dibaca</span><h2>DHCP hanya untuk simulasi aman</h2><p>Docker Desktop di macOS dan Windows berjalan melalui VM/NAT. Website mengajarkan instalasi, konfigurasi, dan validasi DHCP—bukan menyalakan DHCP liar pada LAN sekolah.</p><button className="secondary-button light" onClick={() => go("dhcp")}>Buka modul DHCP →</button></div><div className="safety-icon"><Icon name="shield" size={58}/></div></section>
           </> : <ModuleView key={active} module={modules.find((m) => m.id === active) ?? modules[0]} done={completed.includes(active)} stepDone={completedSteps} quizPassed={passedQuizzes.includes(active)} toggleDone={() => toggleDone(active)} toggleStep={(index) => toggleStep(active, index)} passQuiz={() => passQuiz(active)} />}
         </div>
-        <footer><span>Lab Debian Docker • ASJ XI TKJ</span><span>SMKS Islam 1 Kota Blitar</span></footer>
+        <footer><span>Lab Debian Docker • ASJ XI TKJ</span><span>Wilda Ariffatul Faisalnur, S.Kom • SMKS Islam 1 Kota Blitar</span></footer>
       </main>
     </div>
   );
