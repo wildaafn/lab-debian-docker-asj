@@ -29,6 +29,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
         <meta httpEquiv="Pragma" content="no-cache" />
         <meta httpEquiv="Expires" content="0" />
+        <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
+        <meta httpEquiv="X-Frame-Options" content="SAMEORIGIN" />
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
       </head>
       <body>{children}</body>
     </html>
