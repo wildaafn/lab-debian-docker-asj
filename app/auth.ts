@@ -37,8 +37,9 @@ const TEACHER_ATTEMPTS_KEY = "asj_teacher_failed_attempts";
 // Salt for client-side hashing
 const HASH_SALT = "asj_sec_salt_2026_smk1_";
 
-// Pre-computed SHA-256 hash for default initial PIN 'guru2026'
-export const DEFAULT_TEACHER_PIN_HASH = "8f03c00c735d466986687002fa88390885145bcfbc323381a17fa2b67f13cfb4";
+// Pre-computed SHA-256 hash for PIN 'Ahlulbadar313#' with salt
+export const DEFAULT_TEACHER_PIN_HASH = "265f89ec8f8ee23aa0832469e1105580537dd41d1d268a7947cd0028e863b9d6";
+
 
 export const AVAILABLE_CLASSES = [
   "XI TKJ 1",
@@ -327,7 +328,12 @@ export function getTeacherConfig(): TeacherConfig {
   if (typeof window === "undefined") return { pinHash: DEFAULT_TEACHER_PIN_HASH };
   try {
     const raw = localStorage.getItem(TEACHER_CONFIG_KEY);
-    return raw ? JSON.parse(raw) : { pinHash: DEFAULT_TEACHER_PIN_HASH };
+    if (!raw) return { pinHash: DEFAULT_TEACHER_PIN_HASH };
+    const parsed = JSON.parse(raw);
+    if (parsed.pinHash === "8f03c00c735d466986687002fa88390885145bcfbc323381a17fa2b67f13cfb4") {
+      return { pinHash: DEFAULT_TEACHER_PIN_HASH };
+    }
+    return parsed.pinHash ? parsed : { pinHash: DEFAULT_TEACHER_PIN_HASH };
   } catch {
     return { pinHash: DEFAULT_TEACHER_PIN_HASH };
   }
