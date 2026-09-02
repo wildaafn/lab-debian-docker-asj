@@ -7,7 +7,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![Static Export](https://img.shields.io/badge/deploy-static%20export-23a66f)](#deploy-ke-tencent-edgeone)
 
-Website ini dibuat untuk pembelajaran **Administrasi Sistem Jaringan kelas XI TKJ**. Guru dapat mendemonstrasikan praktik melalui macOS, sedangkan siswa dapat mengikutinya menggunakan Windows 11 dan Docker Desktop tanpa harus menyiapkan banyak mesin virtual.
+Website ini dibuat untuk pembelajaran **Administrasi Sistem Jaringan kelas XI TKJ**. Guru dapat mendemonstrasikan praktik melalui macOS, sedangkan siswa dapat mengikutinya menggunakan Windows 11 dan Docker tanpa harus menyiapkan banyak mesin virtual.
 
 ## Kenapa lab ini menarik?
 
@@ -18,12 +18,40 @@ Website ini dibuat untuk pembelajaran **Administrasi Sistem Jaringan kelas XI TK
 - **Aman untuk kelas** — seluruh layanan berjalan pada jaringan Docker terisolasi.
 - **Responsif** — nyaman dipakai melalui laptop, tablet, maupun ponsel.
 
+## Catatan penting untuk siswa pemula
+
+Siswa **tidak perlu menginstal Debian manual** seperti menginstal sistem operasi di VirtualBox. Lab ini memakai image `debian:12-slim`. Saat perintah `docker pull debian:12-slim` atau `docker run ... debian:12-slim` dijalankan, Docker akan mengambil template Debian kecil dari Docker Hub, lalu menjalankannya sebagai container.
+
+Istilah dasar:
+
+| Istilah | Arti singkat |
+| --- | --- |
+| Image | Template sistem, misalnya `debian:12-slim` |
+| Container | Debian/server yang sedang berjalan dari image |
+| Host | Laptop siswa/guru tempat Docker berjalan |
+| Port mapping | Penghubung port laptop ke port container, contoh `8080:80` |
+| Volume | Penyimpanan data agar tidak hilang saat container dibuat ulang |
+
+## Opsi menjalankan Docker
+
+Docker Desktop nyaman untuk pemula, tetapi bisa berat di laptop tertentu. Pilihan yang bisa dipakai:
+
+| Opsi | Cocok untuk | Catatan |
+| --- | --- | --- |
+| Docker Desktop Windows/macOS | Kelas pemula | Paling mudah dipandu, sudah ada Docker Engine dan CLI |
+| Docker Desktop backend WSL 2 | Windows 11 | Lebih baik daripada backend lama, tetap memakai aplikasi Docker Desktop |
+| Docker Engine + CLI di WSL 2 | Windows yang ingin lebih ringan | Perlu setup lebih teknis oleh guru/admin |
+| Docker Engine native Linux | Laptop Linux/lab komputer | Biasanya paling ringan dan stabil |
+| Colima + Docker CLI | macOS | Alternatif ringan, cocok jika guru siap troubleshooting |
+
+Docker CLI bukan pengganti Docker Engine. CLI hanya alat mengetik perintah `docker`; engine tetap harus berjalan melalui Docker Desktop, WSL 2, Linux native, atau Colima.
+
 ## Modul pembelajaran
 
 | Modul | Topik | Hasil praktik |
 | --- | --- | --- |
-| 00 | Persiapan Docker Desktop | Docker Engine siap di macOS dan Windows 11 |
-| 01 | Debian Client | Jaringan `lab-asj` dan client penguji |
+| 00 | Persiapan Docker | Docker Engine siap dan siswa memahami image/container |
+| 01 | Debian Client | Jaringan `lab-asj` dan client penguji Debian |
 | 02 | Web Server Apache | Situs Apache melalui port mapping |
 | 03 | Database MariaDB | Database persisten dengan volume |
 | 04 | FTP Server vsftpd | Akun dan simulasi upload file |
@@ -32,7 +60,7 @@ Website ini dibuat untuk pembelajaran **Administrasi Sistem Jaringan kelas XI TK
 | 07 | DHCP Simulasi Aman | Konfigurasi dan validasi sintaks DHCP |
 | 08 | Pengelolaan & Reset | Diagnosis, stop, start, dan reset lab |
 
-## Menjalankan secara lokal
+## Menjalankan website secara lokal
 
 Persyaratan: Node.js 22 atau versi yang kompatibel dan npm.
 
@@ -103,4 +131,4 @@ Materi ini ditujukan untuk kegiatan belajar ASJ di **SMKS Islam 1 Kota Blitar**.
 
 ---
 
-Dibuat oleh **Wilda AFN** untuk pembelajaran ASJ XI TKJ.
+Dibuat oleh **Wilda Ariffatul Faisalnur, S.Kom** untuk pembelajaran ASJ XI TKJ.
