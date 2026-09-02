@@ -16,7 +16,11 @@ import {
   verifyTeacherPinSecure,
   updateTeacherPinSecure,
   checkTeacherLockout,
+  getDailyAssignment,
+  saveDailyAssignment,
+  playSoundEffect,
   type StudentProfile,
+  type DailyAssignment,
 } from "./auth";
 import {
   getSupabaseConfig,
@@ -259,6 +263,7 @@ function Command({ block, storageKey, onCommandTyped }: { block: CommandBlock; s
     if (matchPercent >= 80 && !unlocked) {
       setUnlocked(true);
       localStorage.setItem(`asj-unlock-${storageKey}`, "true");
+      playSoundEffect("success");
       if (onCommandTyped) onCommandTyped();
     }
   }, [matchPercent, unlocked, storageKey, onCommandTyped]);
@@ -267,6 +272,7 @@ function Command({ block, storageKey, onCommandTyped }: { block: CommandBlock; s
     setUnderstood(true);
     setUnlocked(true);
     localStorage.setItem(`asj-unlock-${storageKey}`, "true");
+    playSoundEffect("success");
     if (onCommandTyped) onCommandTyped();
   }, [storageKey, onCommandTyped]);
 
@@ -274,6 +280,7 @@ function Command({ block, storageKey, onCommandTyped }: { block: CommandBlock; s
     if (!unlocked) return;
     await navigator.clipboard.writeText(block.command);
     setCopied(true);
+    playSoundEffect("click");
     window.setTimeout(() => setCopied(false), 1600);
   }
 
@@ -293,7 +300,7 @@ function Command({ block, storageKey, onCommandTyped }: { block: CommandBlock; s
 
       {block.explanation && (
         <>
-          <button className="explanation-toggle" onClick={() => setShowExplanation(!showExplanation)}>
+          <button className="explanation-toggle" onClick={() => { setShowExplanation(!showExplanation); playSoundEffect("click"); }}>
             <span className={`toggle-arrow ${showExplanation ? "open" : ""}`}>▶</span>
             📖 Penjelasan Baris Script
           </button>
@@ -354,7 +361,12 @@ function QuizPanel({ moduleId, passed, onPass }: { moduleId: string; passed: boo
   function checkAnswer() {
     if (selected === null) return;
     setChecked(true);
-    if (selected === quiz.answer) onPass();
+    if (selected === quiz.answer) {
+      playSoundEffect("levelup");
+      onPass();
+    } else {
+      playSoundEffect("error");
+    }
   }
 
   return (
@@ -368,7 +380,7 @@ function QuizPanel({ moduleId, passed, onPass }: { moduleId: string; passed: boo
           {quiz.options.map((option, index) => (
             <button
               key={option}
-              onClick={() => { setSelected(index); setChecked(false); }}
+              onClick={() => { setSelected(index); setChecked(false); playSoundEffect("click"); }}
               className={`${selected === index ? "selected" : ""} ${checked && index === quiz.answer ? "correct" : ""} ${checked && selected === index && !correct ? "wrong" : ""}`}
             >
               <span>{String.fromCharCode(65 + index)}</span>{option}
@@ -498,6 +510,344 @@ function ModuleView({
 }
 
 /* ========================================================================= */
+/* DIGITAL CERTIFICATE MODAL                                                 */
+/* ========================================================================= */
+function CertificateModal({
+  student,
+  isOpen,
+  onClose,
+}: {
+  student: StudentProfile | null;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  if (!isOpen || !student) return null;
+
+  function handlePrint() {
+    window.print();
+  }
+
+  const totalMod = modules.length;
+  const isFinishedAll = student.completedModules.length >= totalMod;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-dialog certificate-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>🏆 Sertifikat Kompetensi Praktik ASJ</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="certificate-frame" id="certificate-print-area">
+          <div className="certificate-border">
+            <div className="certificate-inner">
+              <div className="cert-badge-ribbon">SMKS ISLAM 1 BLITAR</div>
+              <div className="cert-header">
+                <h3>SERTIFIKAT KOMPETENSI PRAKTIK</h3>
+                <p>ADMINISTRASI SISTEM JARINGAN (ASJ) — DEBIAN DOCKER LAB</p>
+              </div>
+
+              <p className="cert-to">Diberikan secara resmi kepada:</p>
+              <h1 className="cert-student-name">{student.name}</h1>
+              <p className="cert-meta">
+                NISN: <strong>{student.nisn}</strong> • Kelas: <strong>{student.className}</strong>
+              </p>
+
+              <div className="cert-body">
+                <p>
+                  Telah berhasil menyelesaikan seluruh rangkaian praktikum laboratorium Administrasi Sistem Jaringan berbasis Debian Linux dan Docker secara mandiri, meliputi konfigurasi OS Jaringan, Remote Server SSH, Web Server, Database, FTP, DNS BIND9, Mail Server, DHCP, Proxy Server, Control Panel Hosting, serta Keamanan & Troubleshooting Server.
+                </p>
+              </div>
+
+              <div className="cert-scores-row">
+                <div>
+                  <span>Status Kelulusan</span>
+                  <strong>{isFinishedAll ? "LULUS LENGKAP (100%)" : `${student.completedModules.length}/${totalMod} MODUL`}</strong>
+                </div>
+                <div>
+                  <span>Total XP Capaian</span>
+                  <strong>{student.xp} XP (Level {student.level})</strong>
+                </div>
+                <div>
+                  <span>Checkpoint Kuis</span>
+                  <strong>{student.passedQuizzes.length} Lulus</strong>
+                </div>
+              </div>
+
+              <div className="cert-footer">
+                <div className="cert-date-side">
+                  <span>Kota Blitar, {new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
+                  <p>Kode Verifikasi: <code>ASJ-{student.nisn}-{student.level}X</code></p>
+                </div>
+                <div className="cert-signature-side">
+                  <span>Guru Pembimbing Praktik</span>
+                  <div className="digital-sign-line" />
+                  <strong>Wilda Ariffatul Faisalnur, S.Kom</strong>
+                  <small>NIP / Pengampu Mata Pelajaran ASJ</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-actions-footer">
+          <button className="secondary-button" onClick={onClose}>Tutup</button>
+          <button className="primary-button" onClick={handlePrint}>🖨️ Cetak / Simpan PDF</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================= */
+/* CLASS LEADERBOARD MODAL                                                   */
+/* ========================================================================= */
+function LeaderboardModal({
+  isOpen,
+  onClose,
+  allStudents,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  allStudents: StudentProfile[];
+}) {
+  const [selectedClass, setSelectedClass] = useState<string>("Semua");
+
+  if (!isOpen) return null;
+
+  const filtered = allStudents
+    .filter((s) => selectedClass === "Semua" || s.className === selectedClass)
+    .sort((a, b) => b.xp - a.xp || b.completedModules.length - a.completedModules.length);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-dialog leaderboard-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <span className="eyebrow">Papan Peringkat</span>
+            <h2>🏆 Leaderboard Praktikan ASJ</h2>
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="leaderboard-tabs">
+          <button
+            className={`class-tab ${selectedClass === "Semua" ? "active" : ""}`}
+            onClick={() => setSelectedClass("Semua")}
+          >
+            Semua Kelas
+          </button>
+          {AVAILABLE_CLASSES.map((cls) => (
+            <button
+              key={cls}
+              className={`class-tab ${selectedClass === cls ? "active" : ""}`}
+              onClick={() => setSelectedClass(cls)}
+            >
+              {cls}
+            </button>
+          ))}
+        </div>
+
+        <div className="leaderboard-list">
+          {filtered.length === 0 ? (
+            <div className="empty-state">
+              <p>Belum ada praktikan terdaftar di kelas ini.</p>
+            </div>
+          ) : (
+            filtered.map((s, idx) => (
+              <div key={s.id} className={`leaderboard-item rank-${idx + 1}`}>
+                <div className="leaderboard-rank">
+                  {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`}
+                </div>
+                <div className="leaderboard-info">
+                  <strong>{s.name}</strong>
+                  <span>{s.className} • {s.completedModules.length}/14 Modul • 🔥 {s.streak || 1} Hari</span>
+                </div>
+                <div className="leaderboard-score">
+                  <strong>{s.xp} XP</strong>
+                  <small>Level {s.level}</small>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="modal-actions-footer">
+          <button className="primary-button" onClick={onClose} style={{ marginLeft: "auto" }}>
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================= */
+/* QUICK COMMAND PALETTE (CTRL + K)                                          */
+/* ========================================================================= */
+function QuickSearchModal({
+  isOpen,
+  onClose,
+  onSelectModule,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectModule: (moduleId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (isOpen) setQuery("");
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const results = modules.filter(
+    (m) =>
+      m.title.toLowerCase().includes(query.toLowerCase()) ||
+      m.summary.toLowerCase().includes(query.toLowerCase()) ||
+      m.objectives.some((o) => o.toLowerCase().includes(query.toLowerCase())) ||
+      m.steps.some((s) => s.title.toLowerCase().includes(query.toLowerCase()))
+  );
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-dialog quick-search-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="quick-search-input-box">
+          <span>🔍</span>
+          <input
+            type="text"
+            placeholder="Cari materi, konsep (Debian, DNS, SSH, Web), atau modul..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+          />
+          <kbd>ESC</kbd>
+        </div>
+
+        <div className="quick-search-results">
+          {results.length === 0 ? (
+            <div className="quick-empty">Tidak ada materi yang cocok dengan "{query}".</div>
+          ) : (
+            results.map((m) => (
+              <button
+                key={m.id}
+                className="quick-search-item"
+                onClick={() => {
+                  onSelectModule(m.id);
+                  onClose();
+                }}
+              >
+                <div className="quick-item-icon"><Icon name={m.icon} size={20} /></div>
+                <div className="quick-item-text">
+                  <strong>Modul {m.number}: {m.title}</strong>
+                  <small>{m.summary}</small>
+                </div>
+                <span className="quick-item-level">{m.level}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================= */
+/* INTERACTIVE TOPOLOGY SECTION                                              */
+/* ========================================================================= */
+function InteractiveTopology({
+  onSelectModule,
+}: {
+  onSelectModule: (moduleId: string) => void;
+}) {
+  const [activeServer, setActiveServer] = useState<string>("web");
+  const [packetAnimated, setPacketAnimated] = useState(false);
+
+  const serverDetails: Record<
+    string,
+    { name: string; ip: string; port: string; service: string; config: string; moduleId: string; desc: string }
+  > = {
+    web: { name: "web-asj", ip: "172.25.0.80", port: "8080 -> 80", service: "Apache HTTP Server 2.4", config: "/etc/apache2/sites-available/", moduleId: "web", desc: "Melayani halaman web HTML & Virtual Host." },
+    dns: { name: "dns-asj", ip: "172.25.0.53", port: "1053 -> 53 UDP/TCP", service: "BIND9 DNS Server", config: "/etc/bind/named.conf.local", moduleId: "dns", desc: "Menerjemahkan nama domain *.sekolah.test." },
+    database: { name: "db-asj", ip: "172.25.0.100", port: "3307 -> 3306", service: "MariaDB Enterprise 11", config: "data-db-asj:/var/lib/mysql", moduleId: "database", desc: "Menyimpan data siswa dan database sekolah." },
+    ftp: { name: "ftp-asj", ip: "172.25.0.21", port: "2121 -> 21 & 30000-30009", service: "vsftpd (Secure FTP)", config: "/etc/vsftpd.conf", moduleId: "ftp", desc: "Transfer dan upload berkas website siswa." },
+    mail: { name: "mail-asj", ip: "172.25.0.25", port: "2525 -> 25 & 1143 -> 143", service: "Postfix & Dovecot", config: "/etc/postfix/main.cf", moduleId: "mail", desc: "Kirim kirim email lokal sekolah.test." },
+    dhcp: { name: "dhcp-asj", ip: "172.25.0.150-180", port: "67/68 UDP", service: "ISC DHCP Server", config: "/etc/dhcp/dhcpd.conf", moduleId: "dhcp", desc: "Simulasi pembagian IP Dinamis aman." },
+    proxy: { name: "proxy-asj", ip: "172.25.0.88", port: "3128 -> 3128", service: "Squid Proxy Server", config: "/etc/squid/squid.conf", moduleId: "proxy", desc: "Penyaringan ACL & Caching akses web." },
+    remote: { name: "remote-asj", ip: "172.25.0.22", port: "2222 -> 22", service: "OpenSSH Server 9", config: "/etc/ssh/sshd_config", moduleId: "remote", desc: "Remote command line aman terenkripsi." },
+  };
+
+  function handleServerClick(key: string) {
+    setActiveServer(key);
+    setPacketAnimated(true);
+    playSoundEffect("click");
+    setTimeout(() => setPacketAnimated(false), 900);
+  }
+
+  const cur = serverDetails[activeServer] || serverDetails.web;
+
+  return (
+    <section className="overview-section" id="topologi">
+      <div className="section-intro">
+        <span className="eyebrow">Topologi Interaktif Dinamis</span>
+        <h2>Satu Jaringan Bridge, Layanan Terisolasi</h2>
+        <p>Klik salah satu server di bawah untuk melihat animasi alur paket data dari <code>client-asj</code> dan inspeksi port layanannya:</p>
+      </div>
+
+      <div className="topology">
+        {/* Client */}
+        <div className="topology-client active-client">
+          <Icon name="terminal" />
+          <div>
+            <strong>client-asj (Debian Client)</strong>
+            <span>172.25.0.10 • Workstation Penguji</span>
+          </div>
+        </div>
+
+        {/* Dynamic Packet Animated Wire */}
+        <div className="topology-line">
+          <span className="wire-label">lab-asj • 172.25.0.0/24 (Bridge Network)</span>
+          {packetAnimated && <div className="packet-bullet" />}
+        </div>
+
+        {/* Server Grid */}
+        <div className="server-grid">
+          {Object.entries(serverDetails).map(([key, s]) => (
+            <button
+              key={key}
+              className={`server-node-btn ${activeServer === key ? "active" : ""}`}
+              onClick={() => handleServerClick(key)}
+            >
+              <Icon name={key === "database" ? "database" : key === "dns" ? "dns" : key === "web" ? "web" : key === "mail" ? "mail" : key === "ftp" ? "folder" : key === "dhcp" ? "dhcp" : "shield"} />
+              <strong>{s.name}</strong>
+              <span>{s.ip}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Live Server Inspector Card */}
+        <div className="topology-inspector-card">
+          <div className="inspector-left">
+            <span className="inspector-badge">🔎 Live Inspector: {cur.name}</span>
+            <h3>{cur.service}</h3>
+            <p>{cur.desc}</p>
+            <div className="inspector-details">
+              <div><span>Alamat IP:</span> <code>{cur.ip}</code></div>
+              <div><span>Pemetaan Port:</span> <code>{cur.port}</code></div>
+              <div><span>File Konfigurasi:</span> <code>{cur.config}</code></div>
+            </div>
+          </div>
+          <button className="primary-button" onClick={() => onSelectModule(cur.moduleId)}>
+            Buka Modul Praktik →
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ========================================================================= */
 /* AUTH & STUDENT PROGRESS MODAL                                              */
 /* ========================================================================= */
 function AuthModal({
@@ -538,17 +888,21 @@ function AuthModal({
       if (currentMode === "register") {
         const res = await registerStudentUnified(name, nisn, className, pin);
         if (res.success && res.student) {
+          playSoundEffect("levelup");
           setSuccess(res.message);
           setTimeout(() => onSuccess(res.student!), 700);
         } else {
+          playSoundEffect("error");
           setError(res.message);
         }
       } else {
         const res = await loginStudentUnified(nisn, pin);
         if (res.success && res.student) {
+          playSoundEffect("success");
           setSuccess(res.message);
           setTimeout(() => onSuccess(res.student!), 700);
         } else {
+          playSoundEffect("error");
           setError(res.message);
         }
       }
@@ -564,13 +918,13 @@ function AuthModal({
           <div className="auth-tab-switch">
             <button
               className={`auth-tab ${currentMode === "login" ? "active" : ""}`}
-              onClick={() => { setCurrentMode("login"); setError(""); }}
+              onClick={() => { setCurrentMode("login"); setError(""); playSoundEffect("click"); }}
             >
               Masuk Siswa
             </button>
             <button
               className={`auth-tab ${currentMode === "register" ? "active" : ""}`}
-              onClick={() => { setCurrentMode("register"); setError(""); }}
+              onClick={() => { setCurrentMode("register"); setError(""); playSoundEffect("click"); }}
             >
               Daftar Akun Baru
             </button>
@@ -649,11 +1003,13 @@ function StudentProgressModal({
   isOpen,
   onClose,
   onLogout,
+  onOpenCertificate,
 }: {
   student: StudentProfile | null;
   isOpen: boolean;
   onClose: () => void;
   onLogout: () => void;
+  onOpenCertificate: () => void;
 }) {
   if (!isOpen || !student) return null;
 
@@ -691,6 +1047,16 @@ function StudentProgressModal({
           </div>
         </div>
 
+        <div className="cert-banner-callout">
+          <div className="cert-banner-text">
+            <strong>🎓 Sertifikat Kompetensi Praktik ASJ</strong>
+            <p>Dapat dicetak atau diunduh sebagai portofolio resmi keterampilan laboratorium jaringan.</p>
+          </div>
+          <button className="primary-button" onClick={() => { onClose(); onOpenCertificate(); }}>
+            Lihat Sertifikat 📜
+          </button>
+        </div>
+
         <div className="module-checklist-summary">
           <h3>Daftar Modul Kurikulum ({student.completedModules.length}/{totalMod})</h3>
           <div className="checklist-grid">
@@ -724,8 +1090,10 @@ function StudentProgressModal({
 /* ========================================================================= */
 function TeacherPortal({
   onBack,
+  onOpenCertificateForStudent,
 }: {
   onBack: () => void;
+  onOpenCertificateForStudent: (s: StudentProfile) => void;
 }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [pinInput, setPinInput] = useState("");
@@ -736,14 +1104,13 @@ function TeacherPortal({
   const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
   const [newPin, setNewPin] = useState("");
   const [pinChangeMsg, setPinChangeMsg] = useState("");
-
-  // Supabase config state
-  const [supabaseUrl, setSupabaseUrl] = useState("");
-  const [supabaseAnonKey, setSupabaseAnonKey] = useState("");
-  const [supabaseStatusMsg, setSupabaseStatusMsg] = useState("");
   const [showSqlSchema, setShowSqlSchema] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const [loadingRefresh, setLoadingRefresh] = useState(false);
+
+  // Daily Assignment State
+  const [assignment, setAssignment] = useState<DailyAssignment>(getDailyAssignment());
+  const [assignmentSavedMsg, setAssignmentSavedMsg] = useState("");
 
   useEffect(() => {
     const isTeacherAuth = sessionStorage.getItem("asj_teacher_auth");
@@ -751,9 +1118,6 @@ function TeacherPortal({
       setAuthenticated(true);
       loadStudents();
     }
-    const currentCfg = getSupabaseConfig();
-    setSupabaseUrl(currentCfg.url);
-    setSupabaseAnonKey(currentCfg.anonKey);
   }, []);
 
   async function loadStudents() {
@@ -776,11 +1140,13 @@ function TeacherPortal({
 
     const isValid = await verifyTeacherPinSecure(pinInput);
     if (isValid) {
+      playSoundEffect("levelup");
       setAuthenticated(true);
       sessionStorage.setItem("asj_teacher_auth", "true");
       loadStudents();
       setPinError("");
     } else {
+      playSoundEffect("error");
       const retry = checkTeacherLockout();
       if (retry.locked) {
         setPinError("PIN salah berulang kali! Akses ke Portal Guru dikunci selama 10 menit demi keamanan.");
@@ -818,33 +1184,28 @@ function TeacherPortal({
     }
     const ok = await updateTeacherPinSecure(newPin);
     if (ok) {
+      playSoundEffect("success");
       setPinChangeMsg("✅ PIN Guru berhasil diperbarui & dienkripsi dengan SHA-256!");
       setNewPin("");
     }
   }
 
-  async function handleSaveSupabaseConfig(e: React.FormEvent) {
+  function handleSaveAssignment(e: React.FormEvent) {
     e.preventDefault();
-    setSupabaseStatusMsg("Menghubungkan ke Supabase...");
-    saveSupabaseConfig({ url: supabaseUrl.trim(), anonKey: supabaseAnonKey.trim() });
+    saveDailyAssignment(assignment);
+    playSoundEffect("success");
+    setAssignmentSavedMsg("✅ Tugas harian berhasil diperbarui untuk semua siswa!");
+    setTimeout(() => setAssignmentSavedMsg(""), 3000);
+  }
 
-    const client = getSupabaseClient();
-    if (!client) {
-      setSupabaseStatusMsg("❌ URL atau Anon Key tidak valid.");
-      return;
-    }
-
-    try {
-      const { data, error } = await client.from(ASJ_STUDENTS_TABLE).select("id").limit(1);
-      if (error) {
-        setSupabaseStatusMsg(`⚠️ Terhubung ke project Supabase, tapi tabel 'asj_students' belum dibuat. Silakan copy dan jalankan SQL Schema di bawah! (${error.message})`);
-      } else {
-        setSupabaseStatusMsg("✅ Berhasil terhubung ke Supabase Database Cloud (tabel asj_students)! Data siap disinkronkan.");
-        loadStudents();
-      }
-    } catch (err: any) {
-      setSupabaseStatusMsg(`❌ Gagal koneksi: ${err.message}`);
-    }
+  function toggleAssignmentModule(modId: string) {
+    setAssignment((prev) => {
+      const exists = prev.targetModules.includes(modId);
+      const targetModules = exists
+        ? prev.targetModules.filter((m) => m !== modId)
+        : [...prev.targetModules, modId];
+      return { ...prev, targetModules };
+    });
   }
 
   async function copySqlSchema() {
@@ -903,6 +1264,15 @@ function TeacherPortal({
   const totalMod = modules.length;
   const isSupabaseActive = !!getSupabaseClient();
 
+  // Completion calculation for daily assignment
+  const targetCompletedCount = filteredStudents.filter((s) =>
+    assignment.targetModules.every((m) => s.completedModules.includes(m))
+  ).length;
+  const targetCompletionPct =
+    filteredStudents.length > 0
+      ? Math.round((targetCompletedCount / filteredStudents.length) * 100)
+      : 0;
+
   return (
     <div className="teacher-dashboard">
       <header className="teacher-header">
@@ -957,6 +1327,71 @@ function TeacherPortal({
           </strong>
           <span>Total Script Berhasil Diketik</span>
         </div>
+      </div>
+
+      {/* Teacher Daily Assignment Manager */}
+      <div className="teacher-settings-card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+          <div>
+            <h3>🎯 Pengaturan Misi Praktik Hari Ini</h3>
+            <p style={{ color: "var(--muted)", fontSize: "13px", marginTop: "4px" }}>
+              Tentukan modul mana yang wajib diselesaikan siswa pada sesi lab hari ini.
+            </p>
+          </div>
+          <div className="assignment-progress-stat">
+            <span>Selesai Target Hari Ini ({selectedClass}):</span>
+            <strong>{targetCompletedCount}/{filteredStudents.length} Siswa ({targetCompletionPct}%)</strong>
+          </div>
+        </div>
+
+        {assignmentSavedMsg && <div className="auth-alert success" style={{ marginTop: "12px" }}>{assignmentSavedMsg}</div>}
+
+        <form onSubmit={handleSaveAssignment} style={{ marginTop: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+            <div className="form-group">
+              <label>Judul Misi Tugas</label>
+              <input
+                type="text"
+                value={assignment.title}
+                onChange={(e) => setAssignment({ ...assignment, title: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Keterangan Instruksi</label>
+              <input
+                type="text"
+                value={assignment.description}
+                onChange={(e) => setAssignment({ ...assignment, description: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+
+          <label style={{ fontSize: "13px", fontWeight: 700, display: "block", marginBottom: "8px" }}>
+            Pilih Modul Target Praktik:
+          </label>
+          <div className="assignment-modules-picker">
+            {modules.map((m) => {
+              const isPicked = assignment.targetModules.includes(m.id);
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  className={`assign-mod-chip ${isPicked ? "picked" : ""}`}
+                  onClick={() => toggleAssignmentModule(m.id)}
+                >
+                  <span>{isPicked ? "✓" : "+"}</span>
+                  <span>{m.number}. {m.title}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button type="submit" className="primary-button" style={{ marginTop: "14px" }}>
+            💾 Terapkan Tugas Praktik ke Siswa
+          </button>
+        </form>
       </div>
 
       {/* Filter and search */}
@@ -1042,6 +1477,7 @@ function TeacherPortal({
                     <td>
                       <div className="table-row-actions">
                         <button className="table-btn view" onClick={() => setSelectedStudent(s)}>Detail</button>
+                        <button className="table-btn cert" onClick={() => onOpenCertificateForStudent(s)}>Sertifikat</button>
                         <button className="table-btn del" onClick={() => handleDeleteStudent(s.id, s.name)}>Hapus</button>
                       </div>
                     </td>
@@ -1105,7 +1541,10 @@ function TeacherPortal({
             </div>
 
             <div className="modal-actions-footer">
-              <button className="secondary-button" onClick={() => setSelectedStudent(null)}>Tutup</button>
+              <button className="secondary-button" onClick={() => { const std = selectedStudent; setSelectedStudent(null); onOpenCertificateForStudent(std); }}>
+                📜 Buka Sertifikat Siswa
+              </button>
+              <button className="primary-button" onClick={() => setSelectedStudent(null)}>Tutup</button>
             </div>
           </div>
         </div>
@@ -1124,12 +1563,6 @@ function TeacherPortal({
             ✅ Cloud Supabase Aktif
           </span>
         </div>
-
-        {supabaseStatusMsg && (
-          <div className={`auth-alert ${supabaseStatusMsg.includes("✅") ? "success" : "error"}`} style={{ marginTop: "12px" }}>
-            {supabaseStatusMsg}
-          </div>
-        )}
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "16px" }}>
           <button
@@ -1195,13 +1628,35 @@ export default function Home() {
   const [celebrate, setCelebrate] = useState(false);
   const [menu, setMenu] = useState(false);
 
-  // Student auth states
+  // Theme & Sound state
+  const [theme, setTheme] = useState<"light" | "dark" | "hacker">("light");
+  const [soundMuted, setSoundMuted] = useState(false);
+
+  // Modals state
   const [student, setStudent] = useState<StudentProfile | null>(null);
+  const [allStudents, setAllStudents] = useState<StudentProfile[]>([]);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"login" | "register">("login");
   const [studentProgressOpen, setStudentProgressOpen] = useState(false);
+  const [certificateOpen, setCertificateOpen] = useState(false);
+  const [certificateStudent, setCertificateStudent] = useState<StudentProfile | null>(null);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [quickSearchOpen, setQuickSearchOpen] = useState(false);
+
+  // Daily assignment
+  const [assignment, setAssignment] = useState<DailyAssignment>(getDailyAssignment());
 
   useEffect(() => {
+    // Theme load
+    const savedTheme = (localStorage.getItem("asj-theme") as any) || "light";
+    setTheme(savedTheme);
+    document.documentElement.setAttribute("data-theme", savedTheme);
+
+    // Sound load
+    const isMuted = localStorage.getItem("asj_sound_muted") === "true";
+    setSoundMuted(isMuted);
+
+    // Student session
     const currentStudent = getActiveStudent();
     if (currentStudent) {
       setStudent(currentStudent);
@@ -1214,13 +1669,41 @@ export default function Home() {
       setPassedQuizzes(readStored("asj-quizzes", []));
     }
 
+    // Daily streak
     const today = localDate();
     const previous = readStored<{ last: string; count: number }>("asj-streak", { last: "", count: 0 });
     const yesterday = localDate(-1);
     const next = previous.last === today ? previous : { last: today, count: previous.last === yesterday ? previous.count + 1 : 1 };
     localStorage.setItem("asj-streak", JSON.stringify(next));
     setStreak(next.count);
+
+    // Preload all students for leaderboard
+    fetchAllStudentsUnified().then((data) => setAllStudents(data));
+
+    // Shortcut Ctrl+K / Cmd+K listener
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setQuickSearchOpen((prev) => !prev);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  function toggleTheme() {
+    const next = theme === "light" ? "dark" : theme === "dark" ? "hacker" : "light";
+    setTheme(next);
+    localStorage.setItem("asj-theme", next);
+    document.documentElement.setAttribute("data-theme", next);
+    playSoundEffect("click");
+  }
+
+  function toggleSound() {
+    const next = !soundMuted;
+    setSoundMuted(next);
+    localStorage.setItem("asj_sound_muted", String(next));
+  }
 
   function saveList(setter: React.Dispatch<React.SetStateAction<string[]>>, key: string, update: (prev: string[]) => string[]) {
     setter((prev) => {
@@ -1246,6 +1729,7 @@ export default function Home() {
     saveList(setCompleted, "asj-progress", (prev) => {
       const adding = !prev.includes(id);
       if (adding) {
+        playSoundEffect("levelup");
         setCelebrate(true);
         window.setTimeout(() => setCelebrate(false), 2400);
       }
@@ -1255,9 +1739,11 @@ export default function Home() {
 
   function toggleStep(id: string, index: number) {
     const key = `${id}:${index}`;
-    saveList(setCompletedSteps, "asj-steps", (prev) =>
-      prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]
-    );
+    saveList(setCompletedSteps, "asj-steps", (prev) => {
+      const adding = !prev.includes(key);
+      if (adding) playSoundEffect("success");
+      return adding ? [...prev, key] : prev.filter((x) => x !== key);
+    });
   }
 
   function passQuiz(id: string) {
@@ -1289,6 +1775,7 @@ export default function Home() {
   function go(id: string) {
     setActive(id);
     setMenu(false);
+    playSoundEffect("click");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1302,14 +1789,19 @@ export default function Home() {
   const levelProgress = Math.round(((xp % 250) / 250) * 100);
   const resumeModule = modules.find((module) => !completed.includes(module.id)) ?? modules[0];
   const dailyModule = modules[Math.floor(Date.now() / 86400000) % modules.length];
-  const topologyModules = modules.filter((m) => ["web", "database", "ftp", "dns", "mail", "dhcp"].includes(m.id));
+
+  // Daily Assignment completed check
+  const assignmentCompleted =
+    assignment.active &&
+    assignment.targetModules.length > 0 &&
+    assignment.targetModules.every((m) => completed.includes(m));
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell theme-${theme}`}>
       {celebrate && (
         <div className="celebration" role="status" aria-live="polite">
           <div className="confetti">{Array.from({ length: 18 }).map((_, i) => <i key={i} />)}</div>
-          <strong>Modul selesai! +100 XP</strong>
+          <strong>Modul Selesai! +100 XP</strong>
           <span>Server berikutnya menunggu.</span>
         </div>
       )}
@@ -1362,6 +1854,10 @@ export default function Home() {
             <span className="nav-icon">⌂</span>
             <span>Ringkasan Lab</span>
           </button>
+          <button onClick={() => { setLeaderboardOpen(true); playSoundEffect("click"); }} className="leaderboard-nav-btn">
+            <span className="nav-icon">🏆</span>
+            <span>Leaderboard Siswa</span>
+          </button>
           <button onClick={() => go("teacher")} className={`teacher-nav-btn ${active === "teacher" ? "active" : ""}`}>
             <span className="nav-icon">👑</span>
             <span>Portal Rekap Guru</span>
@@ -1402,13 +1898,48 @@ export default function Home() {
           </div>
 
           <div className="topbar-user-section">
+            {/* Quick Search Shortcut Button */}
+            <button
+              className="topbar-search-trigger"
+              onClick={() => { setQuickSearchOpen(true); playSoundEffect("click"); }}
+              title="Cari Materi (Ctrl+K)"
+            >
+              <span>🔍</span>
+              <kbd className="topbar-kbd">Ctrl+K</kbd>
+            </button>
+
+            {/* Sound Toggle */}
+            <button
+              className="topbar-icon-btn"
+              onClick={toggleSound}
+              title={soundMuted ? "Suara: Mati (Klik untuk Nyalakan)" : "Suara: Aktif"}
+            >
+              {soundMuted ? "🔇" : "🔊"}
+            </button>
+
+            {/* Theme Toggle Button */}
+            <button
+              className="topbar-theme-btn"
+              onClick={toggleTheme}
+              title="Ganti Tema (Terang / Gelap / Hacker)"
+            >
+              {theme === "light" ? "🌙 Gelap" : theme === "dark" ? "⚡ Hacker" : "☀️ Terang"}
+            </button>
+
             {student ? (
               <div className="user-pill">
                 <span className="user-name" onClick={() => setStudentProgressOpen(true)}>
                   👤 {student.name} <b className="pill-class">{student.className}</b>
                 </span>
                 <button className="topbar-btn-progress" onClick={() => setStudentProgressOpen(true)}>
-                  📊 Rapor Saya
+                  📊 Rapor
+                </button>
+                <button
+                  className="topbar-btn-cert"
+                  onClick={() => { setCertificateStudent(student); setCertificateOpen(true); }}
+                  title="Lihat Sertifikat"
+                >
+                  📜
                 </button>
                 <button className="topbar-btn-logout" onClick={handleLogout} title="Keluar">
                   🚪
@@ -1420,13 +1951,13 @@ export default function Home() {
                   className="auth-topbar-btn login"
                   onClick={() => { setAuthModalMode("login"); setAuthModalOpen(true); }}
                 >
-                  Masuk Siswa
+                  Masuk
                 </button>
                 <button
                   className="auth-topbar-btn register"
                   onClick={() => { setAuthModalMode("register"); setAuthModalOpen(true); }}
                 >
-                  Daftar Akun
+                  Daftar
                 </button>
               </div>
             )}
@@ -1442,9 +1973,57 @@ export default function Home() {
         {/* Content switch */}
         <div className="content">
           {active === "teacher" ? (
-            <TeacherPortal onBack={() => go("overview")} />
+            <TeacherPortal
+              onBack={() => go("overview")}
+              onOpenCertificateForStudent={(s) => {
+                setCertificateStudent(s);
+                setCertificateOpen(true);
+              }}
+            />
           ) : active === "overview" ? (
             <>
+              {/* Daily Assignment Banner */}
+              {assignment.active && (
+                <div className={`assignment-hero-card ${assignmentCompleted ? "completed" : ""}`}>
+                  <div className="assignment-badge-tag">🎯 TUGAS PRAKTIK HARI INI</div>
+                  <div className="assignment-card-content">
+                    <div>
+                      <h2>{assignment.title}</h2>
+                      <p>{assignment.description}</p>
+                      <div className="assignment-target-chips">
+                        {assignment.targetModules.map((mId) => {
+                          const mInfo = modules.find((m) => m.id === mId);
+                          const isDone = completed.includes(mId);
+                          return (
+                            <button
+                              key={mId}
+                              className={`assign-chip-link ${isDone ? "done" : ""}`}
+                              onClick={() => go(mId)}
+                            >
+                              <span>{isDone ? "✓ Selesai" : "⏳ Praktikkan"}</span>
+                              <strong>{mInfo ? `${mInfo.number}. ${mInfo.title}` : mId}</strong>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="assignment-status-badge">
+                      {assignmentCompleted ? (
+                        <div className="assign-complete-box">
+                          <span>🎉 Tuntas!</span>
+                          <small>Semua target hari ini selesai</small>
+                        </div>
+                      ) : (
+                        <div className="assign-pending-box">
+                          <span>⏳ Target Praktik</span>
+                          <small>Selesaikan modul di atas</small>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <section className="hero">
                 <div className="hero-copy">
                   <span className="eyebrow">Kurikulum ASJ • Docker lab • CLI server</span>
@@ -1456,14 +2035,12 @@ export default function Home() {
                     <button className="primary-button" onClick={() => go("persiapan")}>
                       Mulai praktik <span>→</span>
                     </button>
-                    {!student && (
-                      <button
-                        className="secondary-button"
-                        onClick={() => { setAuthModalMode("register"); setAuthModalOpen(true); }}
-                      >
-                        Daftar Akun Siswa
-                      </button>
-                    )}
+                    <button
+                      className="secondary-button"
+                      onClick={() => { setLeaderboardOpen(true); playSoundEffect("click"); }}
+                    >
+                      🏆 Lihat Leaderboard
+                    </button>
                     <a className="secondary-button" href="#kurikulum">Lihat kurikulum</a>
                   </div>
                 </div>
@@ -1510,30 +2087,8 @@ export default function Home() {
                 </div>
               </section>
 
-              <section className="overview-section" id="topologi">
-                <div className="section-intro">
-                  <span className="eyebrow">Arsitektur praktik</span>
-                  <h2>Satu jaringan, layanan terpisah</h2>
-                  <p>Kerusakan satu container tidak menghapus seluruh pekerjaan. Semua layanan diakses oleh Debian client melalui jaringan <code>lab-asj</code>.</p>
-                </div>
-                <div className="topology">
-                  <div className="topology-client">
-                    <Icon name="terminal" />
-                    <strong>client-asj</strong>
-                    <span>172.25.0.10</span>
-                  </div>
-                  <div className="topology-line"><span>lab-asj • 172.25.0.0/24</span></div>
-                  <div className="server-grid">
-                    {topologyModules.map((m) => (
-                      <button key={m.id} onClick={() => go(m.id)}>
-                        <Icon name={m.icon} />
-                        <strong>{m.title.replace(" Server", "")}</strong>
-                        <span>{({ web: ".80", database: ".100", ftp: ".21", dns: ".53", mail: ".25", dhcp: "simulasi" } as Record<string, string>)[m.id]}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </section>
+              {/* Dynamic Interactive Topology */}
+              <InteractiveTopology onSelectModule={(mId) => go(mId)} />
 
               <section className="module-list" id="kurikulum">
                 <div className="section-intro">
@@ -1542,7 +2097,7 @@ export default function Home() {
                 </div>
                 <div className="search">
                   <span>⌕</span>
-                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari DHCP, SSH, DNS, proxy..." />
+                  <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari DHCP, SSH, DNS, proxy... (atau tekan Ctrl+K)" />
                 </div>
                 <div className="cards">
                   {filtered.map((m) => (
@@ -1610,6 +2165,31 @@ export default function Home() {
         isOpen={studentProgressOpen}
         onClose={() => setStudentProgressOpen(false)}
         onLogout={handleLogout}
+        onOpenCertificate={() => {
+          setCertificateStudent(student);
+          setCertificateOpen(true);
+        }}
+      />
+
+      {/* Digital Certificate Modal */}
+      <CertificateModal
+        student={certificateStudent}
+        isOpen={certificateOpen}
+        onClose={() => setCertificateOpen(false)}
+      />
+
+      {/* Class Leaderboard Modal */}
+      <LeaderboardModal
+        isOpen={leaderboardOpen}
+        onClose={() => setLeaderboardOpen(false)}
+        allStudents={allStudents}
+      />
+
+      {/* Quick Search Spotlight (Ctrl+K) */}
+      <QuickSearchModal
+        isOpen={quickSearchOpen}
+        onClose={() => setQuickSearchOpen(false)}
+        onSelectModule={(mId) => go(mId)}
       />
     </div>
   );

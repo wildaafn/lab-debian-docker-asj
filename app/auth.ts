@@ -438,3 +438,137 @@ export function exportStudentsToCSV(students: StudentProfile[]): string {
 
   return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
 }
+
+/* ========================================================================= */
+/* TEACHER DAILY ASSIGNMENT                                                  */
+/* ========================================================================= */
+export type DailyAssignment = {
+  title: string;
+  description: string;
+  targetModules: string[];
+  dueDate: string;
+  active: boolean;
+};
+
+const ASSIGNMENT_KEY = "asj_daily_assignment";
+
+export function getDailyAssignment(): DailyAssignment {
+  if (typeof window === "undefined") {
+    return {
+      title: "Misi Praktik: DNS & Web Server",
+      description: "Selesaikan Modul 02 (Web Server Apache) dan Modul 05 (DNS BIND9) hari ini.",
+      targetModules: ["web", "dns"],
+      dueDate: "Hari Ini",
+      active: true,
+    };
+  }
+  try {
+    const raw = localStorage.getItem(ASSIGNMENT_KEY);
+    return raw
+      ? JSON.parse(raw)
+      : {
+          title: "Misi Praktik: DNS & Web Server",
+          description: "Selesaikan Modul 02 (Web Server Apache) dan Modul 05 (DNS BIND9) hari ini.",
+          targetModules: ["web", "dns"],
+          dueDate: "Hari Ini",
+          active: true,
+        };
+  } catch {
+    return {
+      title: "Misi Praktik: DNS & Web Server",
+      description: "Selesaikan Modul 02 (Web Server Apache) dan Modul 05 (DNS BIND9) hari ini.",
+      targetModules: ["web", "dns"],
+      dueDate: "Hari Ini",
+      active: true,
+    };
+  }
+}
+
+export function saveDailyAssignment(assignment: DailyAssignment): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ASSIGNMENT_KEY, JSON.stringify(assignment));
+}
+
+/* ========================================================================= */
+/* SYNTHESIZED WEB AUDIO SFX (ZERO DEPENDENCY)                               */
+/* ========================================================================= */
+export function playSoundEffect(type: "success" | "levelup" | "click" | "error"): void {
+  if (typeof window === "undefined") return;
+  try {
+    const isMuted = localStorage.getItem("asj_sound_muted") === "true";
+    if (isMuted) return;
+
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+
+    if (type === "success") {
+      // Pleasant double chime
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.type = "sine";
+      osc2.type = "triangle";
+
+      osc1.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+      osc1.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15); // E5
+      osc2.frequency.setValueAtTime(783.99, ctx.currentTime + 0.15); // G5
+      osc2.frequency.exponentialRampToValueAtTime(1046.5, ctx.currentTime + 0.3); // C6
+
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start();
+      osc2.start(ctx.currentTime + 0.12);
+      osc1.stop(ctx.currentTime + 0.4);
+      osc2.stop(ctx.currentTime + 0.4);
+    } else if (type === "levelup") {
+      // Fanfare arpeggio
+      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.08);
+
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + idx * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.08 + 0.3);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(ctx.currentTime + idx * 0.08);
+        osc.stop(ctx.currentTime + idx * 0.08 + 0.3);
+      });
+    } else if (type === "click") {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(400, ctx.currentTime);
+      gain.gain.setValueAtTime(0.04, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.05);
+    } else if (type === "error") {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(150, ctx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    }
+  } catch {}
+}
+
