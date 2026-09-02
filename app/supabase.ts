@@ -4,12 +4,16 @@ import { type StudentProfile, hashPin } from "./auth";
 const SUPABASE_CONFIG_KEY = "asj_supabase_custom_config";
 export const ASJ_STUDENTS_TABLE = "asj_students";
 
+export const DEFAULT_SUPABASE_URL = "https://yxwcnqxqidnlidtddrve.supabase.co";
+export const DEFAULT_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4d2NucXhxaWRubGlkdGRkcnZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1OTQ1NDIsImV4cCI6MjEwMzE3MDU0Mn0.Lp7edVwLZWRirE-x1lTsLKQXKRJvOE1i2a-DoZW9kjw";
+
 export type SupabaseConfig = {
   url: string;
   anonKey: string;
 };
 
-// Default from env or local config
+// Default configuration with auto-configured Supabase
 export function getSupabaseConfig(): SupabaseConfig {
   if (typeof window !== "undefined") {
     try {
@@ -22,8 +26,8 @@ export function getSupabaseConfig(): SupabaseConfig {
   }
 
   return {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL,
+    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
   };
 }
 
@@ -110,7 +114,6 @@ export async function supabaseRegister(
   const client = getSupabaseClient();
   const cleanNisn = nisn.trim();
   const cleanName = name.trim();
-
   const hashedPassword = await hashPin(pin);
 
   const newStudent: StudentProfile = {
@@ -143,7 +146,7 @@ export async function supabaseRegister(
   if (!client) {
     return {
       success: true,
-      message: "Akun disimpan secara lokal (Supabase belum dihubungkan).",
+      message: "Akun disimpan secara lokal.",
       student: newStudent,
     };
   }

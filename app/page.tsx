@@ -1092,60 +1092,48 @@ function TeacherPortal({
         </div>
       )}
 
-      {/* Supabase Cloud Configuration Section */}
+      {/* Supabase Cloud Status Section */}
       <div className="teacher-settings-card">
-        <h3>☁️ Integrasi Supabase Cloud Database</h3>
-        <p style={{ color: "var(--muted)", fontSize: "14px", marginTop: "4px" }}>
-          Hubungkan aplikasi ke database Supabase gratis untuk menyinkronkan data siswa dari semua laptop lab & HP secara real-time.
-        </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+          <div>
+            <h3>☁️ Database Supabase Cloud (Otomatis Terhubung)</h3>
+            <p style={{ color: "var(--muted)", fontSize: "13px", marginTop: "4px" }}>
+              Terkoneksi ke project <code>https://yxwcnqxqidnlidtddrve.supabase.co</code> pada tabel <code>asj_students</code>. Seluruh data siswa dan progress otomatis tersinkronisasi secara real-time.
+            </p>
+          </div>
+          <span className="cloud-badge active" style={{ fontSize: "12px", padding: "6px 14px" }}>
+            ✅ Cloud Supabase Aktif
+          </span>
+        </div>
 
         {supabaseStatusMsg && (
-          <div className={`auth-alert ${supabaseStatusMsg.includes("✅") ? "success" : "error"}`}>
+          <div className={`auth-alert ${supabaseStatusMsg.includes("✅") ? "success" : "error"}`} style={{ marginTop: "12px" }}>
             {supabaseStatusMsg}
           </div>
         )}
 
-        <form onSubmit={handleSaveSupabaseConfig} className="supabase-config-form">
-          <div className="form-group">
-            <label>Project URL (misal: https://xyzcompany.supabase.co)</label>
-            <input
-              type="text"
-              placeholder="https://YOUR_PROJECT_ID.supabase.co"
-              value={supabaseUrl}
-              onChange={(e) => setSupabaseUrl(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Project API Key (Anon / Public Key)</label>
-            <input
-              type="password"
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-              value={supabaseAnonKey}
-              onChange={(e) => setSupabaseAnonKey(e.target.value)}
-              required
-            />
-          </div>
-
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
-            <button type="submit" className="primary-button">
-              💾 Simpan & Tes Koneksi Supabase
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setShowSqlSchema(!showSqlSchema)}
-            >
-              📋 {showSqlSchema ? "Sembunyikan SQL Schema" : "Lihat SQL Schema Table"}
-            </button>
-          </div>
-        </form>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "16px" }}>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={loadStudents}
+            disabled={loadingRefresh}
+          >
+            {loadingRefresh ? "Menyinkronkan..." : "🔄 Sinkronkan Ulang Data Cloud"}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setShowSqlSchema(!showSqlSchema)}
+          >
+            📋 {showSqlSchema ? "Sembunyikan SQL Schema" : "Lihat SQL Schema"}
+          </button>
+        </div>
 
         {showSqlSchema && (
           <div className="sql-schema-box">
             <div className="sql-schema-header">
-              <span>SQL Schema untuk Supabase SQL Editor</span>
+              <span>SQL Schema Tabel asj_students</span>
               <button className="copy-button" onClick={copySqlSchema}>
                 {copiedSql ? "✓ Tersalin" : "Salin SQL"}
               </button>
