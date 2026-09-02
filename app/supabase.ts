@@ -111,12 +111,14 @@ export async function supabaseRegister(
   const cleanNisn = nisn.trim();
   const cleanName = name.trim();
 
+  const hashedPassword = await hashPin(pin);
+
   const newStudent: StudentProfile = {
     id: `std_${cleanNisn.replace(/\s+/g, "_")}`,
     nisn: cleanNisn,
     name: cleanName,
     className: className || "XI TKJ 1",
-    passwordHash: hashPin(pin),
+    passwordHash: hashedPassword,
     createdAt: new Date().toISOString(),
     lastActive: new Date().toISOString(),
     completedModules: initialData?.completedModules || [],
@@ -204,7 +206,7 @@ export async function supabaseLogin(
 ): Promise<{ success: boolean; message: string; student?: StudentProfile }> {
   const client = getSupabaseClient();
   const cleanNisn = nisn.trim();
-  const hashed = hashPin(pin);
+  const hashed = await hashPin(pin);
 
   if (!client) {
     return { success: false, message: "Cloud database belum dikonfigurasi." };

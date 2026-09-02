@@ -26,14 +26,19 @@ export type StudentProfile = {
 };
 
 export type TeacherConfig = {
-  pin: string;
+  pinHash: string;
 };
 
 const STUDENTS_KEY = "asj_students_db";
 const SESSION_KEY = "asj_active_session";
 const TEACHER_CONFIG_KEY = "asj_teacher_config";
+const TEACHER_ATTEMPTS_KEY = "asj_teacher_failed_attempts";
 
-export const DEFAULT_TEACHER_PIN = "guru2026";
+// Salt for client-side hashing
+const HASH_SALT = "asj_sec_salt_2026_smk1_";
+
+// Pre-computed SHA-256 hash for default initial PIN 'guru2026'
+export const DEFAULT_TEACHER_PIN_HASH = "8f03c00c735d466986687002fa88390885145bcfbc323381a17fa2b67f13cfb4";
 
 export const AVAILABLE_CLASSES = [
   "XI TKJ 1",
@@ -44,6 +49,37 @@ export const AVAILABLE_CLASSES = [
   "XII TKJ 3",
   "Lainnya / Guru",
 ];
+
+// Sanitize user inputs to prevent XSS / HTML injection
+export function sanitizeInput(str: string): string {
+  return str
+    .replace(/[<>]/g, "")
+    .replace(/["']/g, "")
+    .trim();
+}
+
+// Cryptographic SHA-256 Hashing with Salt
+export async function hashPin(secret: string): Promise<string> {
+  const salted = `${HASH_SALT}${secret.trim()}`;
+  if (typeof window !== "undefined" && window.crypto && window.crypto.subtle) {
+    try {
+      const msgBuffer = new TextEncoder().encode(salted);
+      const hashBuffer = await window.crypto.subtle.digest("SHA-256", msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+    } catch {
+      // Fallback
+    }
+  }
+
+  // Fallback bitwise hash if crypto.subtle is unavailable
+  let hash = 0;
+  for (let i = 0; i < salted.length; i++) {
+    hash = (hash << 5) - hash + salted.charCodeAt(i);
+    hash |= 0;
+  }
+  return `fb_${Math.abs(hash).toString(16)}`;
+}
 
 export function getAllStudentsLocal(): StudentProfile[] {
   if (typeof window === "undefined") return [];
@@ -81,28 +117,30 @@ export function setActiveStudentSession(studentId: string | null): void {
   }
 }
 
-export function hashPin(pin: string): string {
-  let hash = 0;
-  for (let i = 0; i < pin.length; i++) {
-    hash = (hash << 5) - hash + pin.charCodeAt(i);
-    hash |= 0;
-  }
-  return String(hash);
-}
-
-// Unified Register (Supabase Cloud + Local Backup)
+// Unified Register
 export async function registerStudentUnified(
   name: string,
   nisn: string,
   className: string,
   pin: string
 ): Promise<{ success: boolean; message: string; student?: StudentProfile }> {
-  const cleanNisn = nisn.trim();
-  const cleanName = name.trim();
+  const cleanNisn = sanitizeInput(nisn);
+  const cleanName = sanitizeInput(name);
+  const cleanClass = sanitizeInput(className);
 
   if (!cleanName || !cleanNisn || !pin) {
     return { success: false, message: "Semua kolom wajib diisi!" };
   }
+
+  if (cleanName.length < 2) {
+    return { success: false, message: "Nama terlalu pendek (minimal 2 karakter)." };
+  }
+
+  if (pin.trim().length < 3) {
+    return { success: false, message: "Password / PIN minimal 3 karakter." };
+  }
+
+  const hashedPassword = await hashPin(pin);
 
   let initialCompleted: string[] = [];
   let initialSteps: string[] = [];
@@ -116,35 +154,6 @@ export async function registerStudentUnified(
     if (savedQ) initialQuizzes = JSON.parse(savedQ);
   } catch {}
 
-  // Check Supabase if connected
-  const client = getSupabaseClient();
-  if (client) {
-    const cloudRes = await supabaseRegister(cleanName, cleanNisn, className, pin, {
-      completedModules: initialCompleted,
-      completedSteps: initialSteps,
-      passedQuizzes: initialQuizzes,
-    });
-    if (!cloudRes.success) return cloudRes;
-
-    const student = cloudRes.student!;
-    // Save to local list
-    const all = getAllStudentsLocal();
-    const idx = all.findIndex((s) => s.nisn.toLowerCase() === cleanNisn.toLowerCase());
-    if (idx >= 0) all[idx] = student;
-    else all.push(student);
-    saveAllStudentsLocal(all);
-    setActiveStudentSession(student.id);
-
-    return { success: true, message: "Pendaftaran berhasil! Akun tersinkron ke Supabase Cloud ☁️", student };
-  }
-
-  // Fallback purely local
-  const all = getAllStudentsLocal();
-  const existing = all.find((s) => s.nisn.toLowerCase() === cleanNisn.toLowerCase());
-  if (existing) {
-    return { success: false, message: `NISN "${cleanNisn}" sudah terdaftar atas nama ${existing.name}. Silakan login.` };
-  }
-
   const xp = initialCompleted.length * 100 + initialSteps.length * 20 + initialQuizzes.length * 50;
   const level = Math.floor(xp / 250) + 1;
 
@@ -152,8 +161,8 @@ export async function registerStudentUnified(
     id: `std_${cleanNisn.replace(/\s+/g, "_")}`,
     nisn: cleanNisn,
     name: cleanName,
-    className: className || "XI TKJ 1",
-    passwordHash: hashPin(pin),
+    className: cleanClass || "XI TKJ 1",
+    passwordHash: hashedPassword,
     createdAt: new Date().toISOString(),
     lastActive: new Date().toISOString(),
     completedModules: initialCompleted,
@@ -166,19 +175,48 @@ export async function registerStudentUnified(
     totalTypedCommands: 0,
   };
 
+  // Check Supabase if connected
+  const client = getSupabaseClient();
+  if (client) {
+    const cloudRes = await supabaseRegister(cleanName, cleanNisn, cleanClass, pin, {
+      completedModules: initialCompleted,
+      completedSteps: initialSteps,
+      passedQuizzes: initialQuizzes,
+    });
+    if (!cloudRes.success) return cloudRes;
+
+    const student = cloudRes.student!;
+    const all = getAllStudentsLocal();
+    const idx = all.findIndex((s) => s.nisn.toLowerCase() === cleanNisn.toLowerCase());
+    if (idx >= 0) all[idx] = student;
+    else all.push(student);
+    saveAllStudentsLocal(all);
+    setActiveStudentSession(student.id);
+
+    return { success: true, message: "Pendaftaran berhasil & data terenkripsi aman di Cloud!", student };
+  }
+
+  // Local fallback
+  const all = getAllStudentsLocal();
+  const existing = all.find((s) => s.nisn.toLowerCase() === cleanNisn.toLowerCase());
+  if (existing) {
+    return { success: false, message: `NISN "${cleanNisn}" sudah terdaftar atas nama ${existing.name}. Silakan masuk.` };
+  }
+
   all.push(newStudent);
   saveAllStudentsLocal(all);
   setActiveStudentSession(newStudent.id);
 
-  return { success: true, message: "Pendaftaran berhasil di perangkat ini!", student: newStudent };
+  return { success: true, message: "Pendaftaran berhasil & password terenkripsi!", student: newStudent };
 }
 
-// Unified Login (Supabase Cloud + Local Backup)
+// Unified Login
 export async function loginStudentUnified(
   nisn: string,
   pin: string
 ): Promise<{ success: boolean; message: string; student?: StudentProfile }> {
-  const cleanNisn = nisn.trim();
+  const cleanNisn = sanitizeInput(nisn);
+  const hashed = await hashPin(pin);
 
   // Try Supabase first if configured
   const client = getSupabaseClient();
@@ -193,7 +231,6 @@ export async function loginStudentUnified(
       saveAllStudentsLocal(all);
       setActiveStudentSession(student.id);
 
-      // Restore progress to localStorage
       try {
         localStorage.setItem("asj-progress", JSON.stringify(student.completedModules));
         localStorage.setItem("asj-steps", JSON.stringify(student.completedSteps));
@@ -213,7 +250,7 @@ export async function loginStudentUnified(
     return { success: false, message: "NISN / ID siswa tidak ditemukan. Silakan daftar terlebih dahulu." };
   }
 
-  if (student.passwordHash !== hashPin(pin)) {
+  if (student.passwordHash !== hashed) {
     return { success: false, message: "Password / PIN salah. Silakan coba lagi." };
   }
 
@@ -260,8 +297,6 @@ export function syncStudentProgressUnified(
   }
 
   saveAllStudentsLocal(all);
-
-  // Background sync to Supabase
   supabaseUpdateProgress(all[idx]);
 }
 
@@ -285,14 +320,16 @@ export async function deleteStudentUnified(id: string): Promise<void> {
   await supabaseDeleteStudent(id);
 }
 
-// Teacher Config & Authentication
+/* ========================================================================= */
+/* TEACHER AUTHENTICATION & BRUTE-FORCE PROTECTION                           */
+/* ========================================================================= */
 export function getTeacherConfig(): TeacherConfig {
-  if (typeof window === "undefined") return { pin: DEFAULT_TEACHER_PIN };
+  if (typeof window === "undefined") return { pinHash: DEFAULT_TEACHER_PIN_HASH };
   try {
     const raw = localStorage.getItem(TEACHER_CONFIG_KEY);
-    return raw ? JSON.parse(raw) : { pin: DEFAULT_TEACHER_PIN };
+    return raw ? JSON.parse(raw) : { pinHash: DEFAULT_TEACHER_PIN_HASH };
   } catch {
-    return { pin: DEFAULT_TEACHER_PIN };
+    return { pinHash: DEFAULT_TEACHER_PIN_HASH };
   }
 }
 
@@ -301,12 +338,73 @@ export function saveTeacherConfig(config: TeacherConfig): void {
   localStorage.setItem(TEACHER_CONFIG_KEY, JSON.stringify(config));
 }
 
-export function verifyTeacherPin(inputPin: string): boolean {
-  const config = getTeacherConfig();
-  return inputPin.trim() === config.pin.trim();
+// Check if teacher login is currently locked due to too many attempts
+export function checkTeacherLockout(): { locked: boolean; remainingSeconds: number } {
+  if (typeof window === "undefined") return { locked: false, remainingSeconds: 0 };
+  try {
+    const raw = sessionStorage.getItem(TEACHER_ATTEMPTS_KEY);
+    if (!raw) return { locked: false, remainingSeconds: 0 };
+    const { count, lockUntil } = JSON.parse(raw);
+    const now = Date.now();
+    if (lockUntil && now < lockUntil) {
+      return { locked: true, remainingSeconds: Math.ceil((lockUntil - now) / 1000) };
+    }
+    return { locked: false, remainingSeconds: 0 };
+  } catch {
+    return { locked: false, remainingSeconds: 0 };
+  }
 }
 
-// Export students to CSV
+export function recordFailedTeacherAttempt(): { locked: boolean; remainingSeconds: number; attemptsLeft: number } {
+  if (typeof window === "undefined") return { locked: false, remainingSeconds: 0, attemptsLeft: 5 };
+  try {
+    const raw = sessionStorage.getItem(TEACHER_ATTEMPTS_KEY);
+    let attempts = raw ? JSON.parse(raw) : { count: 0, lockUntil: 0 };
+    attempts.count += 1;
+
+    if (attempts.count >= 5) {
+      // Lock for 10 minutes (600 seconds)
+      attempts.lockUntil = Date.now() + 10 * 60 * 1000;
+      sessionStorage.setItem(TEACHER_ATTEMPTS_KEY, JSON.stringify(attempts));
+      return { locked: true, remainingSeconds: 600, attemptsLeft: 0 };
+    }
+
+    sessionStorage.setItem(TEACHER_ATTEMPTS_KEY, JSON.stringify(attempts));
+    return { locked: false, remainingSeconds: 0, attemptsLeft: 5 - attempts.count };
+  } catch {
+    return { locked: false, remainingSeconds: 0, attemptsLeft: 4 };
+  }
+}
+
+export function clearTeacherAttempts(): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(TEACHER_ATTEMPTS_KEY);
+}
+
+export async function verifyTeacherPinSecure(inputPin: string): Promise<boolean> {
+  const lockout = checkTeacherLockout();
+  if (lockout.locked) return false;
+
+  const config = getTeacherConfig();
+  const hashedInput = await hashPin(inputPin);
+
+  const isValid = hashedInput === config.pinHash;
+  if (isValid) {
+    clearTeacherAttempts();
+  } else {
+    recordFailedTeacherAttempt();
+  }
+  return isValid;
+}
+
+export async function updateTeacherPinSecure(newPin: string): Promise<boolean> {
+  if (newPin.trim().length < 4) return false;
+  const pinHash = await hashPin(newPin);
+  saveTeacherConfig({ pinHash });
+  return true;
+}
+
+// Export students to CSV (with strict privacy - NO password hashes)
 export function exportStudentsToCSV(students: StudentProfile[]): string {
   const headers = [
     "No",

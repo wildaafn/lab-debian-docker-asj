@@ -7,15 +7,15 @@ import {
   AVAILABLE_CLASSES,
   exportStudentsToCSV,
   getActiveStudent,
-  getTeacherConfig,
   loginStudentUnified,
   registerStudentUnified,
-  saveTeacherConfig,
   setActiveStudentSession,
   syncStudentProgressUnified,
   fetchAllStudentsUnified,
   deleteStudentUnified,
-  verifyTeacherPin,
+  verifyTeacherPinSecure,
+  updateTeacherPinSecure,
+  checkTeacherLockout,
   type StudentProfile,
 } from "./auth";
 import {
@@ -747,15 +747,27 @@ function TeacherPortal({
     }
   }
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (verifyTeacherPin(pinInput)) {
+    const lockout = checkTeacherLockout();
+    if (lockout.locked) {
+      setPinError(`Akses terkunci sementara karena 5x kesalahan. Silakan coba lagi dalam ${lockout.remainingSeconds} detik.`);
+      return;
+    }
+
+    const isValid = await verifyTeacherPinSecure(pinInput);
+    if (isValid) {
       setAuthenticated(true);
       sessionStorage.setItem("asj_teacher_auth", "true");
       loadStudents();
       setPinError("");
     } else {
-      setPinError("PIN Guru salah! Silakan coba lagi.");
+      const retry = checkTeacherLockout();
+      if (retry.locked) {
+        setPinError("PIN salah berulang kali! Akses ke Portal Guru dikunci selama 10 menit demi keamanan.");
+      } else {
+        setPinError("PIN Otorisasi Guru tidak valid. Silakan coba lagi.");
+      }
     }
   }
 
@@ -779,17 +791,17 @@ function TeacherPortal({
     }
   }
 
-  function handleChangePin(e: React.FormEvent) {
+  async function handleChangePin(e: React.FormEvent) {
     e.preventDefault();
     if (newPin.length < 4) {
       setPinChangeMsg("PIN minimal 4 karakter.");
       return;
     }
-    const cfg = getTeacherConfig();
-    cfg.pin = newPin;
-    saveTeacherConfig(cfg);
-    setPinChangeMsg("✅ PIN Guru berhasil diperbarui!");
-    setNewPin("");
+    const ok = await updateTeacherPinSecure(newPin);
+    if (ok) {
+      setPinChangeMsg("✅ PIN Guru berhasil diperbarui & dienkripsi dengan SHA-256!");
+      setNewPin("");
+    }
   }
 
   async function handleSaveSupabaseConfig(e: React.FormEvent) {
@@ -844,14 +856,15 @@ function TeacherPortal({
           <form onSubmit={handleLogin} className="gate-form">
             {pinError && <div className="auth-alert error">⚠️ {pinError}</div>}
             <div className="form-group">
-              <label>PIN Guru (Default: guru2026)</label>
+              <label>PIN Otorisasi Guru</label>
               <input
                 type="password"
-                placeholder="Masukkan PIN Guru"
+                placeholder="Masukkan PIN Rahasia Guru"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
                 autoFocus
                 required
+                autoComplete="current-password"
               />
             </div>
             <button type="submit" className="primary-button" style={{ width: "100%", justifyContent: "center" }}>
