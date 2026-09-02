@@ -6,7 +6,7 @@ import { modules, type CommandBlock, type Module } from "./data";
 type Quiz = { question: string; options: string[]; answer: number; explanation: string };
 
 const quizzes: Record<string, Quiz> = {
-  persiapan: { question: "Apa tanda Docker siap dipakai?", options: ["Browser terbuka", "Docker Engine running", "Wi-Fi dimatkan"], answer: 1, explanation: "Docker Engine harus aktif sebelum container dapat dijalankan." },
+  persiapan: { question: "Apa tanda Docker siap dipakai?", options: ["Browser terbuka", "Docker Engine running", "Wi-Fi dimatikan"], answer: 1, explanation: "Docker Engine harus aktif sebelum container dapat dijalankan." },
   debian: { question: "Mengapa semua container memakai jaringan lab-asj?", options: ["Agar saling terhubung secara terisolasi", "Agar RAM bertambah", "Agar Docker tidak perlu diinstal"], answer: 0, explanation: "Bridge network membuat perangkat lab saling berkomunikasi tanpa mencampuri LAN sekolah." },
   web: { question: "Arti pemetaan port 8080:80 adalah…", options: ["Port 80 host menuju 8080 container", "Port 8080 host menuju 80 container", "Kedua port dinonaktifkan"], answer: 1, explanation: "Akses ke port 8080 host diteruskan ke Apache pada port 80 di container." },
   database: { question: "Fungsi volume data-db-asj adalah…", options: ["Menyimpan data agar tetap ada", "Mengganti password otomatis", "Mempercepat internet"], answer: 0, explanation: "Volume membuat data database tetap tersimpan walau container dibuat ulang." },
