@@ -23,6 +23,7 @@ import {
   saveSupabaseConfig,
   getSupabaseClient,
   SUPABASE_SQL_SCHEMA,
+  ASJ_STUDENTS_TABLE,
 } from "./supabase";
 
 const modules: Module[] = [...baseModules, ...curriculumModules];
@@ -803,11 +804,11 @@ function TeacherPortal({
     }
 
     try {
-      const { data, error } = await client.from("students").select("id").limit(1);
+      const { data, error } = await client.from(ASJ_STUDENTS_TABLE).select("id").limit(1);
       if (error) {
-        setSupabaseStatusMsg(`⚠️ Terhubung ke project, tapi tabel 'students' belum dibuat. Silakan copy dan jalankan SQL Schema di bawah! (${error.message})`);
+        setSupabaseStatusMsg(`⚠️ Terhubung ke project Supabase, tapi tabel 'asj_students' belum dibuat. Silakan copy dan jalankan SQL Schema di bawah! (${error.message})`);
       } else {
-        setSupabaseStatusMsg("✅ Berhasil terhubung ke Supabase Database Cloud!");
+        setSupabaseStatusMsg("✅ Berhasil terhubung ke Supabase Database Cloud (tabel asj_students)! Data siap disinkronkan.");
         loadStudents();
       }
     } catch (err: any) {

@@ -1,7 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { type StudentProfile, getTeacherConfig, hashPin } from "./auth";
+import { type StudentProfile, hashPin } from "./auth";
 
 const SUPABASE_CONFIG_KEY = "asj_supabase_custom_config";
+export const ASJ_STUDENTS_TABLE = "asj_students";
 
 export type SupabaseConfig = {
   url: string;
@@ -54,11 +55,14 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 /* ========================================================================= */
-/* SUPABASE SQL SCHEMA SCRIPT FOR TEACHER                                     */
+/* SUPABASE SQL SCHEMA SCRIPT (DEDICATED ASJ TABLE: asj_students)            */
 /* ========================================================================= */
-export const SUPABASE_SQL_SCHEMA = `-- Jalankan SQL ini di menu SQL Editor di dashboard Supabase Anda:
+export const SUPABASE_SQL_SCHEMA = `-- ==========================================================
+-- TABEL KHUSUS APLIKASI LAB ASJ (TERISOLASI DARI NETDEFENDER)
+-- Nama Tabel: asj_students
+-- ==========================================================
 
-CREATE TABLE IF NOT EXISTS public.students (
+CREATE TABLE IF NOT EXISTS public.asj_students (
   id TEXT PRIMARY KEY,
   nisn TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
@@ -77,20 +81,21 @@ CREATE TABLE IF NOT EXISTS public.students (
 );
 
 -- Aktifkan Row Level Security (RLS)
-ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.asj_students ENABLE ROW LEVEL SECURITY;
 
--- Kebijakan akses anonim (untuk website lab):
-CREATE POLICY "Public read/write access" ON public.students
+-- Kebijakan Akses Publik Terpisah untuk Lab ASJ
+DROP POLICY IF EXISTS "asj_students_public_access" ON public.asj_students;
+CREATE POLICY "asj_students_public_access" ON public.asj_students
   FOR ALL
   USING (true)
   WITH CHECK (true);
 `;
 
 /* ========================================================================= */
-/* DATABASE OPERATIONS                                                       */
+/* DATABASE OPERATIONS (Using asj_students)                                  */
 /* ========================================================================= */
 
-// Register student in Supabase
+// Register student in Supabase asj_students
 export async function supabaseRegister(
   name: string,
   nisn: string,
@@ -134,7 +139,6 @@ export async function supabaseRegister(
   };
 
   if (!client) {
-    // Fallback to local storage if Supabase is not yet configured
     return {
       success: true,
       message: "Akun disimpan secara lokal (Supabase belum dihubungkan).",
@@ -143,11 +147,21 @@ export async function supabaseRegister(
   }
 
   try {
-    const { data: existing } = await client
-      .from("students")
+    const { data: existing, error: selectErr } = await client
+      .from(ASJ_STUDENTS_TABLE)
       .select("id, name, nisn")
       .eq("nisn", cleanNisn)
       .maybeSingle();
+
+    if (selectErr) {
+      if (selectErr.message.includes("relation") || selectErr.message.includes("does not exist")) {
+        return {
+          success: false,
+          message: "Tabel 'asj_students' belum dibuat di Supabase. Silakan buka Portal Guru dan jalankan SQL Schema.",
+        };
+      }
+      throw selectErr;
+    }
 
     if (existing) {
       return {
@@ -156,7 +170,7 @@ export async function supabaseRegister(
       };
     }
 
-    const { error } = await client.from("students").insert({
+    const { error } = await client.from(ASJ_STUDENTS_TABLE).insert({
       id: newStudent.id,
       nisn: newStudent.nisn,
       name: newStudent.name,
@@ -176,14 +190,14 @@ export async function supabaseRegister(
 
     if (error) throw error;
 
-    return { success: true, message: "Pendaftaran berhasil di Supabase Cloud!", student: newStudent };
+    return { success: true, message: "Pendaftaran berhasil di Supabase Cloud (asj_students)!", student: newStudent };
   } catch (err: any) {
     console.error("Supabase Register error:", err);
     return { success: false, message: err.message || "Gagal mendaftar ke cloud database." };
   }
 }
 
-// Login student from Supabase
+// Login student from Supabase asj_students
 export async function supabaseLogin(
   nisn: string,
   pin: string
@@ -198,14 +212,14 @@ export async function supabaseLogin(
 
   try {
     const { data, error } = await client
-      .from("students")
+      .from(ASJ_STUDENTS_TABLE)
       .select("*")
       .eq("nisn", cleanNisn)
       .maybeSingle();
 
     if (error) throw error;
     if (!data) {
-      return { success: false, message: "NISN / ID tidak ditemukan di cloud." };
+      return { success: false, message: "NISN / ID tidak ditemukan di asj_students." };
     }
 
     if (data.password_hash !== hashed) {
@@ -214,7 +228,7 @@ export async function supabaseLogin(
 
     // Update last active
     await client
-      .from("students")
+      .from(ASJ_STUDENTS_TABLE)
       .update({ last_active: new Date().toISOString() })
       .eq("id", data.id);
 
@@ -243,14 +257,14 @@ export async function supabaseLogin(
   }
 }
 
-// Sync progress to Supabase
+// Sync progress to Supabase asj_students
 export async function supabaseUpdateProgress(student: StudentProfile): Promise<boolean> {
   const client = getSupabaseClient();
   if (!client || !student.id) return false;
 
   try {
     const { error } = await client
-      .from("students")
+      .from(ASJ_STUDENTS_TABLE)
       .update({
         last_active: new Date().toISOString(),
         completed_modules: student.completedModules,
@@ -271,14 +285,14 @@ export async function supabaseUpdateProgress(student: StudentProfile): Promise<b
   }
 }
 
-// Fetch all students for Teacher Dashboard
+// Fetch all students for Teacher Dashboard from asj_students
 export async function supabaseFetchAllStudents(): Promise<StudentProfile[]> {
   const client = getSupabaseClient();
   if (!client) return [];
 
   try {
     const { data, error } = await client
-      .from("students")
+      .from(ASJ_STUDENTS_TABLE)
       .select("*")
       .order("last_active", { ascending: false });
 
@@ -308,13 +322,13 @@ export async function supabaseFetchAllStudents(): Promise<StudentProfile[]> {
   }
 }
 
-// Delete student from Supabase
+// Delete student from Supabase asj_students
 export async function supabaseDeleteStudent(id: string): Promise<boolean> {
   const client = getSupabaseClient();
   if (!client) return false;
 
   try {
-    const { error } = await client.from("students").delete().eq("id", id);
+    const { error } = await client.from(ASJ_STUDENTS_TABLE).delete().eq("id", id);
     return !error;
   } catch {
     return false;
