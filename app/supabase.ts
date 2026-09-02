@@ -15,20 +15,28 @@ export type SupabaseConfig = {
 
 // Default configuration with auto-configured Supabase
 export function getSupabaseConfig(): SupabaseConfig {
+  let url = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  let anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+
   if (typeof window !== "undefined") {
     try {
       const stored = localStorage.getItem(SUPABASE_CONFIG_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.url && parsed.anonKey) return parsed;
+        if (
+          parsed.url &&
+          parsed.url.startsWith("https://") &&
+          parsed.anonKey &&
+          parsed.anonKey.startsWith("eyJ")
+        ) {
+          url = parsed.url;
+          anonKey = parsed.anonKey;
+        }
       }
     } catch {}
   }
 
-  return {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL,
-    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
-  };
+  return { url, anonKey };
 }
 
 export function saveSupabaseConfig(config: SupabaseConfig): void {
