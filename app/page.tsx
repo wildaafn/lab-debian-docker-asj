@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { modules as baseModules, type CommandBlock, type Module } from "./data";
 import { curriculumModules } from "./curriculum";
 
@@ -63,18 +63,133 @@ function Icon({ name, size = 22 }: { name: string; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconPaths[name] ?? iconPaths.shield}</svg>;
 }
 
-function CopyButton({ command }: { command: string }) {
+/* ===== Normalize command for comparison ===== */
+function normalizeCmd(s: string): string {
+  return s.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function calcMatchPercent(typed: string, target: string): number {
+  const a = normalizeCmd(typed);
+  const b = normalizeCmd(target);
+  if (b.length === 0) return 100;
+  if (a.length === 0) return 0;
+  let matches = 0;
+  let bIdx = 0;
+  for (let i = 0; i < a.length && bIdx < b.length; i++) {
+    if (a[i] === b[bIdx]) { matches++; bIdx++; }
+  }
+  return Math.min(100, Math.round((matches / b.length) * 100));
+}
+
+/* ===== Command Component with Guard ===== */
+function Command({ block, storageKey }: { block: CommandBlock; storageKey: string }) {
   const [copied, setCopied] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [typedText, setTypedText] = useState("");
+  const [unlocked, setUnlocked] = useState(false);
+  const [understood, setUnderstood] = useState(false);
+
+  // Load unlock state from localStorage
+  useEffect(() => {
+    const saved = readStored<boolean>(`asj-unlock-${storageKey}`, false);
+    if (saved) setUnlocked(true);
+  }, [storageKey]);
+
+  const matchPercent = useMemo(() => calcMatchPercent(typedText, block.command), [typedText, block.command]);
+
+  useEffect(() => {
+    if (matchPercent >= 80 && !unlocked) {
+      setUnlocked(true);
+      localStorage.setItem(`asj-unlock-${storageKey}`, "true");
+    }
+  }, [matchPercent, unlocked, storageKey]);
+
+  const handleUnderstood = useCallback(() => {
+    setUnderstood(true);
+    setUnlocked(true);
+    localStorage.setItem(`asj-unlock-${storageKey}`, "true");
+  }, [storageKey]);
+
   async function copy() {
-    await navigator.clipboard.writeText(command);
+    if (!unlocked) return;
+    await navigator.clipboard.writeText(block.command);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }
-  return <button className={`copy-button ${copied ? "copied" : ""}`} onClick={copy} aria-label="Salin perintah">{copied ? "Tersalin" : "Salin"}</button>;
-}
 
-function Command({ block }: { block: CommandBlock }) {
-  return <div className="command-block"><div className="command-head"><span>{block.label}</span><span className="where">{block.where}</span><CopyButton command={block.command} /></div><pre><code>{block.command}</code></pre></div>;
+  const copyClass = copied ? "copy-button copied" : unlocked ? "copy-button copy-unlocked" : "copy-button copy-locked";
+  const copyLabel = copied ? "✓ Tersalin" : unlocked ? "📋 Salin" : "🔒 Ketik dulu";
+
+  return (
+    <div className="command-block">
+      <div className="command-head">
+        <span>{block.label}</span>
+        <span className="where">{block.where}</span>
+        <button className={copyClass} onClick={copy} aria-label="Salin perintah" disabled={!unlocked}>
+          {copyLabel}
+        </button>
+      </div>
+      <pre><code>{block.command}</code></pre>
+
+      {/* Explanation Panel */}
+      {block.explanation && (
+        <>
+          <button className="explanation-toggle" onClick={() => setShowExplanation(!showExplanation)}>
+            <span className={`toggle-arrow ${showExplanation ? "open" : ""}`}>▶</span>
+            📖 Penjelasan Baris
+          </button>
+          <div className={`explanation-content ${showExplanation ? "visible" : ""}`}>
+            {block.explanation.split("\n").map((line, i) => {
+              const arrowIdx = line.indexOf("→");
+              if (arrowIdx > -1) {
+                return (
+                  <span className="line-explain" key={i}>
+                    <span className="cmd-part">{line.substring(0, arrowIdx)}</span>
+                    <span className="desc-part">→{line.substring(arrowIdx + 1)}</span>
+                  </span>
+                );
+              }
+              return <span className="line-explain" key={i}>{line}</span>;
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Typing Guard */}
+      {!unlocked && (
+        <div className="typing-guard">
+          <div className="typing-guard-label">
+            <span>⌨️ Ketik ulang perintah di atas</span>
+            <span className={`match-pct ${matchPercent >= 80 ? "good" : ""}`}>
+              {matchPercent}%
+            </span>
+          </div>
+          <textarea
+            className="typing-area"
+            placeholder="Ketik ulang perintah yang ada di atas untuk membuka tombol Salin..."
+            value={typedText}
+            onChange={(e) => setTypedText(e.target.value)}
+            rows={3}
+          />
+          <div className="typing-progress-bar">
+            <span style={{ width: `${matchPercent}%` }} />
+          </div>
+
+          {/* Understood button - only shown if explanation is open */}
+          {showExplanation && !understood && (
+            <button className="understood-btn" onClick={handleUnderstood}>
+              ✅ Saya sudah membaca penjelasan dan paham
+            </button>
+          )}
+          {understood && (
+            <button className="understood-btn confirmed" disabled>
+              ✅ Sudah dikonfirmasi paham
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function QuizPanel({ moduleId, passed, onPass }: { moduleId: string; passed: boolean; onPass: () => void }) {
@@ -100,13 +215,23 @@ function QuizPanel({ moduleId, passed, onPass }: { moduleId: string; passed: boo
 
 function ModuleView({ module, done, stepDone, quizPassed, toggleDone, toggleStep, passQuiz }: { module: Module; done: boolean; stepDone: string[]; quizPassed: boolean; toggleDone: () => void; toggleStep: (index: number) => void; passQuiz: () => void }) {
   const finishedSteps = module.steps.filter((_, index) => stepDone.includes(`${module.id}:${index}`)).length;
+
+  // Generate unique storage keys for each command block
+  let cmdCounter = 0;
+
   return <article className="lesson" id={module.id}>
     <header className="lesson-header"><div className="lesson-icon"><Icon name={module.icon} size={28} /></div><div className="lesson-title"><div className="lesson-meta"><span>Modul {module.number}</span><span>{module.duration}</span><span className={`level level-${module.level.toLowerCase()}`}>{module.level}</span></div><h1>{module.title}</h1><p>{module.summary}</p></div><button className={`done-button ${done ? "is-done" : ""}`} onClick={toggleDone}><span>{done ? "✓" : "○"}</span>{done ? "Modul selesai" : "+100 XP · Selesaikan"}</button></header>
     <div className="lesson-progress"><div><span style={{ width: `${Math.round((finishedSteps / module.steps.length) * 100)}%` }} /></div><p>{finishedSteps} dari {module.steps.length} langkah ditandai selesai</p></div>
     {module.warning && <div className="warning"><strong>Perhatian</strong><p>{module.warning}</p></div>}
     <section className="objectives"><p className="section-label">Target praktik</p><div>{module.objectives.map((item) => <span key={item}>✓ {item}</span>)}</div></section>
-    <section className="steps">{module.steps.map((item, index) => { const checked = stepDone.includes(`${module.id}:${index}`); return <div className={`step ${checked ? "step-complete" : ""}`} key={item.title}><div className="step-number">{String(index + 1).padStart(2, "0")}</div><div className="step-content"><div className="step-title-row"><h2>{item.title}</h2><button onClick={() => toggleStep(index)} className="step-check"><span>{checked ? "✓" : "+20"}</span>{checked ? "Sudah dicoba" : "Tandai langkah"}</button></div><p>{item.description}</p>{item.commands?.map((block) => <Command key={block.label} block={block} />)}{item.note && <div className="note">Catatan: {item.note}</div>}</div></div>})}</section>
-    {module.test && <section className="test-panel"><div className="test-heading"><Icon name="shield" /><div><p className="section-label">Uji hasil</p><h2>Pastikan layanan berhasil</h2></div></div>{module.test.map((block) => <Command key={block.label} block={block} />)}</section>}
+    <section className="steps">{module.steps.map((item, index) => { const checked = stepDone.includes(`${module.id}:${index}`); return <div className={`step ${checked ? "step-complete" : ""}`} key={item.title}><div className="step-number">{String(index + 1).padStart(2, "0")}</div><div className="step-content"><div className="step-title-row"><h2>{item.title}</h2><button onClick={() => toggleStep(index)} className="step-check"><span>{checked ? "✓" : "+20"}</span>{checked ? "Sudah dicoba" : "Tandai langkah"}</button></div><p>{item.description}</p>{item.commands?.map((block) => {
+      const key = `${module.id}-${cmdCounter++}`;
+      return <Command key={key} block={block} storageKey={key} />;
+    })}{item.note && <div className="note">Catatan: {item.note}</div>}</div></div>})}</section>
+    {module.test && <section className="test-panel"><div className="test-heading"><Icon name="shield" /><div><p className="section-label">Uji hasil</p><h2>Pastikan layanan berhasil</h2></div></div>{module.test.map((block) => {
+      const key = `${module.id}-test-${cmdCounter++}`;
+      return <Command key={key} block={block} storageKey={key} />;
+    })}</section>}
     <QuizPanel moduleId={module.id} passed={quizPassed} onPass={passQuiz} />
   </article>;
 }
