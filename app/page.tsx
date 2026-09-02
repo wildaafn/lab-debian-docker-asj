@@ -81,6 +81,178 @@ function calcMatchPercent(typed: string, target: string): number {
   return Math.min(100, Math.round((matches / b.length) * 100));
 }
 
+/* ===== Typo Detection ===== */
+type TypoWarning = {
+  line: number;
+  typed: string;
+  expected: string;
+  wrongWord: string;
+  correctWord: string;
+  severity: "error" | "warning" | "info";
+};
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function detectTypos(typed: string, target: string): TypoWarning[] {
+  const warnings: TypoWarning[] = [];
+  const typedLines = typed.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+  const targetLines = target.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+  if (typedLines.length === 0) return warnings;
+
+  for (let i = 0; i < typedLines.length; i++) {
+    const tl = typedLines[i];
+
+    // Find the best matching target line
+    let bestMatch = 0;
+    let bestDist = Infinity;
+    for (let j = 0; j < targetLines.length; j++) {
+      const d = levenshtein(tl.toLowerCase(), targetLines[j].toLowerCase());
+      if (d < bestDist) { bestDist = d; bestMatch = j; }
+    }
+
+    const expected = targetLines[bestMatch] ?? "";
+    if (!expected) continue;
+
+    // If exact match, skip
+    if (tl === expected) continue;
+
+    // Word-level diff
+    const typedWords = tl.split(/\s+/);
+    const expectedWords = expected.split(/\s+/);
+
+    for (let w = 0; w < typedWords.length; w++) {
+      const tw = typedWords[w];
+      // Find the closest expected word
+      let closestWord = expectedWords[w] ?? "";
+      let closestDist = closestWord ? levenshtein(tw.toLowerCase(), closestWord.toLowerCase()) : Infinity;
+
+      // Also check nearby words (±2) for reordering
+      for (let k = Math.max(0, w - 2); k < Math.min(expectedWords.length, w + 3); k++) {
+        const d = levenshtein(tw.toLowerCase(), expectedWords[k].toLowerCase());
+        if (d < closestDist) { closestDist = d; closestWord = expectedWords[k]; }
+      }
+
+      if (closestDist === 0) continue; // exact match
+
+      // Determine severity based on edit distance relative to word length
+      const maxLen = Math.max(tw.length, closestWord.length);
+      if (maxLen === 0) continue;
+
+      const ratio = closestDist / maxLen;
+
+      if (closestDist <= 3 && ratio < 0.6) {
+        // Close match — likely a typo
+        const severity: "error" | "warning" = closestDist === 1 ? "warning" : "error";
+        warnings.push({
+          line: i + 1,
+          typed: tl,
+          expected,
+          wrongWord: tw,
+          correctWord: closestWord,
+          severity,
+        });
+      } else if (tw.length > 2 && !expectedWords.some(ew => ew.toLowerCase() === tw.toLowerCase())) {
+        // Word not found at all in expected line — might be entirely wrong
+        if (closestWord && closestDist <= 5 && ratio < 0.7) {
+          warnings.push({
+            line: i + 1,
+            typed: tl,
+            expected,
+            wrongWord: tw,
+            correctWord: closestWord,
+            severity: "error",
+          });
+        }
+      }
+    }
+
+    // Check for missing critical characters: quotes, semicolons, pipes
+    const criticalChars = ["'", '"', "|", ";", ">", "<", "{", "}", "(", ")"];
+    for (const ch of criticalChars) {
+      const typedCount = (tl.match(new RegExp(`\\${ch}`, "g")) || []).length;
+      const expectedCount = (expected.match(new RegExp(`\\${ch}`, "g")) || []).length;
+      if (typedCount < expectedCount) {
+        warnings.push({
+          line: i + 1,
+          typed: tl,
+          expected,
+          wrongWord: `(kurang ${expectedCount - typedCount}× karakter '${ch}')`,
+          correctWord: ch,
+          severity: "info",
+        });
+      }
+    }
+  }
+
+  // Deduplicate: max 1 warning per wrongWord per line
+  const seen = new Set<string>();
+  return warnings.filter(w => {
+    const key = `${w.line}:${w.wrongWord}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 5); // max 5 warnings at a time
+}
+
+function TypoWarnings({ typed, target }: { typed: string; target: string }) {
+  const warnings = useMemo(() => detectTypos(typed, target), [typed, target]);
+
+  if (warnings.length === 0) {
+    // If user has typed something and no typos, show positive feedback
+    const hasContent = typed.trim().length > 5;
+    if (hasContent) {
+      return (
+        <div className="typo-panel typo-ok">
+          <span className="typo-icon">✅</span>
+          <span>Tidak ada typo terdeteksi. Lanjutkan!</span>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <div className="typo-panel typo-has-errors">
+      <div className="typo-header">
+        <span className="typo-icon">⚠️</span>
+        <span>Terdeteksi {warnings.length} kemungkinan kesalahan ketik:</span>
+      </div>
+      <div className="typo-list">
+        {warnings.map((w, i) => (
+          <div key={i} className={`typo-item typo-${w.severity}`}>
+            <span className="typo-line-num">Baris {w.line}</span>
+            {w.severity === "info" ? (
+              <span className="typo-detail">
+                <span className="typo-missing">{w.wrongWord}</span>
+              </span>
+            ) : (
+              <span className="typo-detail">
+                <span className="typo-wrong">{w.wrongWord}</span>
+                <span className="typo-arrow">→</span>
+                <span className="typo-correct">{w.correctWord}</span>
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ===== Command Component with Guard ===== */
 function Command({ block, storageKey }: { block: CommandBlock; storageKey: string }) {
   const [copied, setCopied] = useState(false);
@@ -174,6 +346,9 @@ function Command({ block, storageKey }: { block: CommandBlock; storageKey: strin
           <div className="typing-progress-bar">
             <span style={{ width: `${matchPercent}%` }} />
           </div>
+
+          {/* Typo Detection Warnings */}
+          <TypoWarnings typed={typedText} target={block.command} />
 
           {/* Understood button - only shown if explanation is open */}
           {showExplanation && !understood && (
