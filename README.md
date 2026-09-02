@@ -1,13 +1,13 @@
-# Lab Debian Docker — ASJ XI TKJ
+# Lab Debian Docker — ASJ XI-XII TKJ
 
-> Lab belajar interaktif untuk mempraktikkan administrasi Debian Server dengan Docker—ringan, terisolasi, dan mudah diulang.
+> Lab belajar interaktif untuk mempraktikkan Administrasi Sistem Jaringan dengan Docker: ringan, terisolasi, bertahap, dan mudah diulang.
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-087ea4?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![Static Export](https://img.shields.io/badge/deploy-static%20export-23a66f)](#deploy-ke-tencent-edgeone)
 
-Website ini dibuat untuk pembelajaran **Administrasi Sistem Jaringan kelas XI TKJ**. Guru dapat mendemonstrasikan praktik melalui macOS, sedangkan siswa dapat mengikutinya menggunakan Windows 11 dan Docker tanpa harus menyiapkan banyak mesin virtual.
+Website ini dibuat untuk pembelajaran **Administrasi Sistem Jaringan kelas XI-XII TKJ**. Materi disusun mengikuti alur silabus ASJ: sistem operasi jaringan, DHCP, remote server, DNS, FTP, web server, database server, mail server, proxy server, control panel hosting, keamanan, dan troubleshooting.
 
 ## Kenapa lab ini menarik?
 
@@ -46,6 +46,21 @@ Docker Desktop nyaman untuk pemula, tetapi bisa berat di laptop tertentu. Piliha
 
 Docker CLI bukan pengganti Docker Engine. CLI hanya alat mengetik perintah `docker`; engine tetap harus berjalan melalui Docker Desktop, WSL 2, Linux native, atau Colima.
 
+## Pemetaan silabus ASJ
+
+| Kelas/Semester | Materi silabus | Modul di website |
+| --- | --- | --- |
+| XI Ganjil | Instalasi sistem operasi jaringan GUI/CLI | 00 Persiapan Docker, 01 Debian Client, 09 Instalasi Sistem Operasi Jaringan |
+| XI Ganjil | DHCP Server | 07 DHCP Simulasi Aman |
+| XI Ganjil | Remote Server SSH/Telnet | 10 Remote Server SSH dan Telnet |
+| XI Genap | DNS Server | 05 DNS Server BIND9 |
+| XI Genap | FTP Server | 04 FTP Server vsftpd |
+| XI Genap | Web Server dan Database Server | 02 Web Server Apache, 03 Database MariaDB |
+| XII | Mail Server | 06 Mail Server Lokal |
+| XII | Proxy Server | 11 Proxy Server Squid |
+| XII | Control Panel Hosting | 12 Control Panel Hosting |
+| XII | Keamanan dan troubleshooting | 08 Pengelolaan & Reset, 13 Keamanan dan Troubleshooting Server |
+
 ## Modul pembelajaran
 
 | Modul | Topik | Hasil praktik |
@@ -59,6 +74,11 @@ Docker CLI bukan pengganti Docker Engine. CLI hanya alat mengetik perintah `dock
 | 06 | Mail Server Lokal | SMTP dan IMAP untuk domain lab |
 | 07 | DHCP Simulasi Aman | Konfigurasi dan validasi sintaks DHCP |
 | 08 | Pengelolaan & Reset | Diagnosis, stop, start, dan reset lab |
+| 09 | Instalasi Sistem Operasi Jaringan | Perbandingan GUI/CLI dan simulasi Debian Server |
+| 10 | Remote Server SSH dan Telnet | Login remote aman dengan SSH dan risiko Telnet |
+| 11 | Proxy Server Squid | Caching, ACL, dan filtering sederhana |
+| 12 | Control Panel Hosting | Konsep web, database, domain, email, dan backup hosting |
+| 13 | Keamanan dan Troubleshooting Server | Log, port, koneksi, hardening, dan diagnosis |
 
 ## Menjalankan website secara lokal
 
@@ -118,7 +138,8 @@ Docker Desktop pada macOS dan Windows berjalan melalui VM/NAT. Praktik DHCP difo
 
 ```text
 app/
-├── data.ts       # Materi dan perintah seluruh modul
+├── curriculum.ts # Modul tambahan sesuai silabus ASJ XI-XII
+├── data.ts       # Materi dan perintah modul inti Docker lab
 ├── globals.css   # Tampilan, animasi, dan layout responsif
 ├── layout.tsx    # Metadata website
 └── page.tsx      # Antarmuka serta interaksi belajar
@@ -131,4 +152,4 @@ Materi ini ditujukan untuk kegiatan belajar ASJ di **SMKS Islam 1 Kota Blitar**.
 
 ---
 
-Dibuat oleh **Wilda Ariffatul Faisalnur, S.Kom** untuk pembelajaran ASJ XI TKJ.
+Dibuat oleh **Wilda Ariffatul Faisalnur, S.Kom** untuk pembelajaran ASJ XI-XII TKJ.
