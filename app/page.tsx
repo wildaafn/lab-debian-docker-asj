@@ -436,6 +436,25 @@ function ModuleView({
         <p className="section-label">Target praktik</p>
         <div>{module.objectives.map((item) => <span key={item}>✓ {item}</span>)}</div>
       </section>
+
+      {module.theory && (
+        <section className="theory-panel">
+          <div className="theory-header">
+            <span className="theory-badge">🧠 Landasan Teori & Konsep</span>
+            <h2>{module.theory.title}</h2>
+            <p className="theory-summary">{module.theory.summary}</p>
+          </div>
+          <div className="theory-grid">
+            {module.theory.points.map((pt, i) => (
+              <div key={i} className="theory-point">
+                <strong>💡 {pt.term}</strong>
+                <p>{pt.desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="steps">
         {module.steps.map((item, index) => {
           const checked = stepDone.includes(`${module.id}:${index}`);
